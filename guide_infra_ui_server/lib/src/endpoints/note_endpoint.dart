@@ -15,7 +15,7 @@ class NoteEndpoint extends Endpoint {
   /// Delete note from database
   Future<bool> deleteNote(Session session, int id) async {
     final response =
-    await Note.delete(session, where: (note) => note.id.equals(id));
+        await Note.delete(session, where: (note) => note.id.equals(id));
     return response == 1;
   }
 
@@ -27,13 +27,15 @@ class NoteEndpoint extends Endpoint {
 
   /// Retrieve all saved notes from the database
   Future<List<Note>> getNotes(Session session) async {
+    final service = CodePipeline(region: 'ap-northeast-1');
 
-    final service = CodePipeline(region: 'ap-southeast-1');
-
-    final pipeline = service.getPipeline(name: 'pipeline-for-dev-kcmsr-test-ui');
-
-    print(pipeline);
-
+    final pipeline = await service.listPipelines();
+    pipeline.pipelines?.forEach((element) {
+      print(element.name);
+    });
+    final testUIPipeline =
+        await service.getPipeline(name: "pipeline-for-dev-kcmsr-test-ui");
+    var config = PipelineDeclaration;
     final notes = Note.find(session);
     return notes;
   }

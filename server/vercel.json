@@ -1,0 +1,14 @@
+{
+    "builds": [
+        {
+            "src": "nest-cli.json",
+            "use": "@vercel/node"
+        }
+    ],
+    "routes": [
+        {
+            "src": "/(.*)",
+            "dest": "dist/main.js"
+        }
+    ]
+}
