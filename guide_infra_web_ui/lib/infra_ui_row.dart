@@ -1,10 +1,10 @@
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'dialog.dart';
 import 'infra_ui.dto.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:getwidget/getwidget.dart';
@@ -52,7 +52,7 @@ class _InfraModelRowState extends State<InfraModelRow> {
 
   runUpdatePipeline(
       pipelineName, targetBranch, envName, bool runPipeline) async {
-    _showDialog("Updating Pipeline.");
+    _showDialog("Updating pipelines...");
     await updatePipeline(pipelineName, targetBranch, envName, runPipeline);
   }
 
@@ -69,17 +69,15 @@ class _InfraModelRowState extends State<InfraModelRow> {
   }
 
   _showDialog(String message) async {
-    GFToast.showToast(
-      message,
-      context,
-      toastPosition: GFToastPosition.TOP,
-      textStyle: TextStyle(fontSize: 16, color: GFColors.DARK),
-      backgroundColor: GFColors.LIGHT,
-      trailing: const Icon(
-        Icons.notifications,
-        color: GFColors.SUCCESS,
-      ),
-    );
+    Fluttertoast.showToast(
+        msg: message,
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.CENTER,
+        timeInSecForIosWeb: 5,
+        backgroundColor: Colors.black,
+        textColor: Colors.white,
+        webBgColor: "linear-gradient(to right, #ffffff, #fffff)",
+        fontSize: 16.0);
   }
 
   @override
@@ -88,7 +86,7 @@ class _InfraModelRowState extends State<InfraModelRow> {
         widget.infraData.EnvName.isNotEmpty ? widget.infraData.EnvName : "";
     return SizedBox(
         child: Padding(
-      padding: EdgeInsets.symmetric(horizontal: 50),
+      padding: const EdgeInsets.symmetric(horizontal: 50),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -128,18 +126,6 @@ class _InfraModelRowState extends State<InfraModelRow> {
               ),
               GFButton(
                   onPressed: () {
-                    GFToast.showToast(
-                      'Updating pipeline...',
-                      context,
-                      toastPosition: GFToastPosition.TOP,
-                      textStyle: TextStyle(fontSize: 16, color: GFColors.DARK),
-                      backgroundColor: GFColors.LIGHT,
-                      trailing: const Icon(
-                        Icons.notifications,
-                        color: GFColors.SUCCESS,
-                      ),
-                    );
-
                     runUpdatePipeline(widget.infraData.PipelineName,
                         dropdownValue?.name, widget.infraData.EnvName, false);
                   },
@@ -149,7 +135,6 @@ class _InfraModelRowState extends State<InfraModelRow> {
               ),
               GFButton(
                   onPressed: () {
-                    var a = 0;
                     runUpdatePipeline(widget.infraData.PipelineName,
                         dropdownValue?.name, widget.infraData.EnvName, true);
                   },

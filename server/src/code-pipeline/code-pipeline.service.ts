@@ -20,18 +20,13 @@ export class CodePipelineService {
     this.region = this.configService.get<string>('REGION');
     this.client = new CodePipelineClient({ region: this.region });
   }
-  async configPipeline({
-    pipelineName,
-    targetBranch,
-    isStartPipeline,
-    envName,
-  }) {
+  async configPipeline({ pipelineName, targetBranch, runPipeline, envName }) {
     const updatedCurrentPipeline = await this.updatePipeline(
       pipelineName,
       targetBranch,
     );
     this.dynamoDBService.updateDynamoDB(envName, targetBranch, pipelineName);
-    if (isStartPipeline) {
+    if (runPipeline) {
       await this.startPipeline(pipelineName);
     }
     return updatedCurrentPipeline;
