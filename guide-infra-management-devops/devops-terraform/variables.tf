@@ -14,10 +14,6 @@ variable "service" {
   type = string
 }
 
-variable "s3_bucket_response_json_default" {
-  type = string
-}
-
 variable "ecr_repo_name" {
   type = string
 }
@@ -31,5 +27,12 @@ variable "domain" {
 }
 
 variable "dynamo_table" {
+  type = string
+}
+
+variable "vpc" {
+}
+
+variable "s3_bucket_dev_kcmsr_sources" {
   type = string
 }

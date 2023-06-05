@@ -21,5 +21,5 @@ resource "aws_route53_record" "route53_record" {
 }
 
 data "aws_route53_zone" "route53_zone" {
-  name = "${var.domain}"
+  name = var.domain
 }

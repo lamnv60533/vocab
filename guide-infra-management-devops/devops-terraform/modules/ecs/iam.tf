@@ -1,5 +1,5 @@
 resource "aws_iam_role" "ecs_task_execution_role" {
-  name = "guide-infra-role-name"
+  name = "guide-infra-ecs-task-execution-role"
 
   assume_role_policy = <<EOF
 {
@@ -10,7 +10,6 @@ resource "aws_iam_role" "ecs_task_execution_role" {
      "Principal": {
        "Service": "ecs-tasks.amazonaws.com"
      },
-     "Resource": "arn:aws:iam::613546001725:role/access-s3-bucket-role",
      "Effect": "Allow",
      "Sid": ""
    }
@@ -20,7 +19,7 @@ EOF
 }
 
 resource "aws_iam_role" "ecs_task_role" {
-  name = "guide-infra-role-name-task"
+  name = "guide-infra-ecs-task-role"
 
   assume_role_policy = <<EOF
 {
@@ -32,7 +31,15 @@ resource "aws_iam_role" "ecs_task_role" {
        "Service": "ecs-tasks.amazonaws.com"
      },
      "Effect": "Allow",
-     "Sid": ""
+     "Sid": "1"
+    },
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "AWS": "arn:aws:iam::613546001725:role/access-s3-bucket-role"
+      },
+      "Effect": "Allow",
+      "Sid": "2"
     }
  ]
 }
@@ -42,11 +49,6 @@ EOF
 resource "aws_iam_role_policy_attachment" "ecs-task-execution-role-policy-attachment" {
   role       = aws_iam_role.ecs_task_execution_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
-
-resource "aws_iam_role_policy_attachment" "ecs-task-execution-access-s3-attachment" {
-  role       = aws_iam_role.ecs_task_execution_role.name
-  policy_arn = "arn:aws:iam::613546001725:role/access-s3-bucket-role"
 }
 
 resource "aws_iam_role_policy_attachment" "task_s3" {

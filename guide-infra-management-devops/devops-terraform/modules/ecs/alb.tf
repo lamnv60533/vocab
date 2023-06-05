@@ -1,5 +1,5 @@
 resource "aws_lb" "alb" {
-  name                       = "${var.project}-alb"
+  name                       = "${var.project}-${var.service}-alb"
   internal                   = false
   drop_invalid_header_fields = true
   ip_address_type            = "ipv4"
@@ -12,12 +12,12 @@ resource "aws_lb" "alb" {
 
   access_logs {
     bucket  = aws_s3_bucket.s3_bucket.bucket
-    prefix  = "${var.service}"
+    prefix  = var.service
     enabled = true
   }
 
   tags = {
-    Name    = "tf-${var.service}-alb"
+    Name    = "tf-${var.project}-${var.service}-alb"
     Project = var.project
   }
 }

@@ -4,7 +4,7 @@ resource "aws_cloudwatch_log_group" "cloudwatch_log_group" {
 
 
   tags = {
-    Name = "/ecs/logs/${var.project}--${var.service}"
+    Name = "/ecs/logs/${var.project}-${var.service}"
   }
 }
 

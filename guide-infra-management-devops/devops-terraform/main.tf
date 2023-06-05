@@ -2,16 +2,6 @@ provider "aws" {
   region = "ap-northeast-1"
 }
 
-module "networking" {
-  source = "./modules/networking"
-
-  project             = var.project
-  vpc_cidr            = "10.0.0.0/16"
-  private_subnets     = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-  public_subnets      = ["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"]
-  elasticache_subnets = ["10.0.7.0/24", "10.0.8.0/24", "10.0.9.0/24"]
-}
-
 module "ecr" {
   source = "./modules/ecr"
 
@@ -19,10 +9,32 @@ module "ecr" {
   service = var.service
 }
 
-module "s3" {
-  source      = "./modules/s3"
-  project     = var.project
-  bucket_name = var.s3_bucket_response_json_default
+module "alb_sg" {
+  source = "terraform-in-action/sg/aws"
+  vpc_id = var.vpc.vpc_id
+  name   = "${var.project}-${var.service}-alb-sg"
+  ingress_rules = [
+    {
+      port        = 80
+      cidr_blocks = ["0.0.0.0/0"]
+    },
+    {
+      port        = 443
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
+}
+
+module "server_sg" {
+  source = "terraform-in-action/sg/aws"
+  vpc_id = var.vpc.vpc_id
+  name   = "${var.project}-${var.service}-server-sg"
+  ingress_rules = [
+    {
+      port            = 8080
+      security_groups = [module.alb_sg.security_group.id]
+    }
+  ]
 }
 
 module "ecs" {
@@ -30,8 +42,11 @@ module "ecs" {
 
   project = var.project
   service = var.service
-  vpc     = module.networking.vpc
-  sg      = module.networking.sg
+  vpc     = var.vpc
+  sg      = {
+    alb    = module.alb_sg.security_group.id
+    server = module.server_sg.security_group.id
+  }
 
   account_id = var.account_id
   ecs = {
@@ -41,7 +56,7 @@ module "ecs" {
     env = {
       dynamo_table = var.dynamo_table
       region = var.region
-      s3_bucket  = module.s3.s3_bucket.bucket
+      s3_bucket  = var.s3_bucket_dev_kcmsr_sources
     }
   }
 
