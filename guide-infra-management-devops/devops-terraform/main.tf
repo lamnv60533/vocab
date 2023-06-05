@@ -42,8 +42,6 @@ module "ecs" {
       dynamo_table = var.dynamo_table
       region = var.region
       s3_bucket  = module.s3.s3_bucket.bucket
-      aws_access_key_id = var.aws_access_key_id
-      aws_secret_access_key = var.aws_secret_access_key
     }
   }
 
@@ -55,7 +53,7 @@ module "ecs" {
     healthy_threshold   = "5"
     interval            = "30"
     healthcheck_status  = "200"
-    healthcheck_path    = "/api/v1/s3"
+    healthcheck_path    = "/api/v1/health"
     healthcheck_timeout = "5"
     unhealthy_threshold = "2"
   }
