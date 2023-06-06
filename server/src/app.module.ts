@@ -6,9 +6,11 @@ import { S3Module } from './s3/s3.module';
 import { CodePipelineService } from './code-pipeline/code-pipeline.service';
 import { DynamodbService } from './dynamodb/dynamodb.service';
 import { ConfigModule } from '@nestjs/config';
+import { HealthModule } from "./health/health.module";
 
 @Module({
   imports: [
+    HealthModule,
     DynamodbModule,
     CodePipelineModule,
     S3Module,
