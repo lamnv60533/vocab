@@ -12,12 +12,18 @@ class SideMenu extends StatelessWidget {
       width: 10,
       child: ListView(
         children: [
-          DrawerHeader(
-            child: Image.asset(
-              "assets/images/logo-1.png",
-              height: 40,
+            SizedBox(
+                height: 100,
+                child: DrawerHeader(
+                    child: Container(
+                        alignment: Alignment.topLeft,
+                        child: Image.asset(
+                            "assets/images/logo-1.png",
+                            height: 40,
+                        ),
+                    ),
+                ),
             ),
-          ),
           ExpandedListTile(
             title: "Dashboard",
             svgSrc: "assets/icons/menu_dashboard.svg",
