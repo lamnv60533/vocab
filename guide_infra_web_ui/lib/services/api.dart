@@ -1,16 +1,15 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:guide_infra_web_ui/services/storage.dart';
 
 class Api {
   final Dio api = Dio();
 
-  final _storage = const FlutterSecureStorage();
+  final StorageService _storage = StorageService();
 
   Api() {
     api.interceptors
         .add(InterceptorsWrapper(onRequest: (options, handler) async {
-      var accessToken = await _storage.read(key: "accessToken");
+      var accessToken = await _storage.getAccessToken();
       if (accessToken != "") {
         options.headers['Authorization'] = 'Bearer $accessToken';
       }
@@ -55,12 +54,4 @@ class Api {
   //     return false;
   //   }
   // }
-
-  Future setAccessToken(String accessToken) async {
-    await _storage.write(key: "accessToken", value: accessToken);
-  }
-
-  Future getAccessToken() async {
-    await _storage.read(key: "accessToken");
-  }
 }

@@ -2,13 +2,14 @@ import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:guide_infra_web_ui/services/api.dart';
 import 'package:guide_infra_web_ui/services/logger.dart';
+import 'package:guide_infra_web_ui/services/storage.dart';
 
 class AuthService {
   final StreamController<bool> _onAuthStateChange =
       StreamController.broadcast();
   final SERVER_URL = dotenv.env['SERVER_HOST'];
   final logger = LogService().logger;
-
+  final StorageService _storage = StorageService();
   Stream<bool> get onAuthStateChange => _onAuthStateChange.stream;
 
   Future<bool> login(String? state) async {
@@ -20,9 +21,9 @@ class AuthService {
       try {
         final response = await di0.post(url, data: {'token': state});
         if (response.statusCode == 201) {
-          _onAuthStateChange.add(true);
           var accessToken = response.data['data']['access_token'];
-          api.setAccessToken(accessToken);
+          await _storage.setAccessToken(accessToken);
+          _onAuthStateChange.add(true);
           return true;
         }
       } catch (e) {

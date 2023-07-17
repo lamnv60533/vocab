@@ -6,9 +6,11 @@ import 'package:guide_infra_web_ui/screens/login/login_screen.dart';
 import 'package:guide_infra_web_ui/screens/main/main_screen.dart';
 import 'package:guide_infra_web_ui/screens/login-success/loggin_success.dart';
 import 'package:guide_infra_web_ui/services/app_service.dart';
+import 'package:guide_infra_web_ui/services/storage.dart';
 
 class AppRouter {
   late final AppService appService;
+  final StorageService _storage = StorageService();
   GoRouter get router => _goRouter;
 
   AppRouter(this.appService);
@@ -41,13 +43,13 @@ class AppRouter {
       ),
     ],
     // errorBuilder: (context, state) => ErrorPage(error: state.error.toString()),
-    redirect: (BuildContext context, GoRouterState state) {
+    redirect: (BuildContext context, GoRouterState state) async {
       // context.watch<AppService>();
       final loginLocation = state.namedLocation(APP_PAGE.login.toName);
       final homeLocation = state.namedLocation(APP_PAGE.home.toName);
       final splashLocation = state.namedLocation(APP_PAGE.splash.toName);
-
-      final isLogedIn = appService.loginState;
+      final accessToken = await _storage.readSecureData("accessToken");
+      final isLogedIn = accessToken != null;
       final isInitialized = appService.initialized;
 
       if (!isInitialized) {
