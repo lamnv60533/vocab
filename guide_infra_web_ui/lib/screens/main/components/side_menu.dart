@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:guide_infra_web_ui/services/auth_service.dart';
+import 'package:provider/provider.dart';
 
 class SideMenu extends StatelessWidget {
   const SideMenu({
@@ -51,6 +53,13 @@ class SideMenu extends StatelessWidget {
             press: () {},
             emptyList: true,
           ),
+          DrawerListTile(
+            title: "Logout",
+            svgSrc: "assets/icons/logout.svg",
+            press: () async {
+              await Provider.of<AuthService>(context, listen: false).logOut();
+            },
+          )
         ],
       ),
     );

@@ -25,4 +25,8 @@ class StorageService {
   Future getAccessToken() async {
     return await _secureStorage.read(key: "accessToken");
   }
+
+  Future removeStorageValue(String key) async {
+    await _secureStorage.delete(key: key);
+  }
 }

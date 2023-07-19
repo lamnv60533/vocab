@@ -27,6 +27,7 @@ class AuthService {
           return true;
         }
       } catch (e) {
+        await _storage.removeStorageValue("accessToken");
         logger.e("Error: $e");
       }
     }
@@ -34,7 +35,8 @@ class AuthService {
     return false;
   }
 
-  void logOut() {
+  Future<void> logOut() async {
+    await _storage.removeStorageValue("accessToken");
     _onAuthStateChange.add(false);
   }
 }

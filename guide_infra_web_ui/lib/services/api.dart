@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:guide_infra_web_ui/services/storage.dart';
 
 class Api {
   final Dio api = Dio();
-
+  final StreamController<bool> _onAuthStateChange =
+      StreamController.broadcast();
   final StorageService _storage = StorageService();
 
   Api() {
@@ -16,14 +19,17 @@ class Api {
       options.headers['Content-Type'] = 'application/json; charset=UTF-8';
       return handler.next(options);
     }, onError: (DioException error, handler) async {
-      // if ((error.response?.statusCode == 401 &&
-      //     error.response?.data['message'] == "Invalid JWT")) {
-      //   if (await _storage.containsKey(key: 'refreshToken')) {
-      //     if (await refreshToken()) {
-      //       return handler.resolve(await _retry(error.requestOptions));
-      //     }
-      //   }
-      // }
+      if ((error.response?.statusCode == 401 &&
+          error.response?.data['message'] == "Invalid JWT")) {
+        // if (await _storage.containsKey(key: 'refreshToken')) {
+        //   if (await refreshToken()) {
+        //     return handler.resolve(await _retry(error.requestOptions));
+        //   }
+        // }
+
+        _storage.removeStorageValue("accessToken");
+        _onAuthStateChange.add(false);
+      }
       return handler.next(error);
     }));
   }
