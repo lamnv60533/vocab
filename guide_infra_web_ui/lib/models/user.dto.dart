@@ -28,6 +28,6 @@ class User {
         accessToken: responseData['access_token'],
         realmAccess: responseData['realm_access'],
         resourceAccess: responseData['realm_access'],
-        roles: responseData["roles"]);
+        roles: responseData["realm_access"]["roles"]);
   }
 }

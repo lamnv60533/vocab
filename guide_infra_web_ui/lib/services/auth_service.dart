@@ -27,11 +27,19 @@ class AuthService {
           var accessToken = response.data['data']['access_token'];
           await _storage.setAccessToken(accessToken);
           _onAuthStateChange.add(true);
-          final user = User(username: "liam", roles: [
-            "guide-infra-admin",
-            "guide-infra-user",
-            "uma_protection"
-          ]);
+          // TBD integrate later
+          // final info = jsonDecode(response.data['data']);
+          // final user = User.fromJson(info)
+
+          // Temp setting role
+          final user = User(
+              username: "liam",
+              roles: [
+                "guide-infra-admin",
+                "guide-infra-user",
+                "uma_protection"
+              ],
+              email: "liam@gmail.com");
           _onUserInfoChange.add(user);
           return true;
         }

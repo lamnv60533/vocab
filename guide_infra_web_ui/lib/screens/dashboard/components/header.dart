@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:guide_infra_web_ui/controllers/MenuAppController.dart';
 import 'package:guide_infra_web_ui/responsive.dart';
+import 'package:guide_infra_web_ui/services/user_service.dart';
 import 'package:provider/provider.dart';
 
 import '../../../constants.dart';
@@ -41,6 +42,7 @@ class ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final email = context.watch<UserService>().email.toString();
     return Container(
       margin: const EdgeInsets.only(left: defaultPadding),
       padding: const EdgeInsets.symmetric(
@@ -59,9 +61,10 @@ class ProfileCard extends StatelessWidget {
             height: 38,
           ),
           if (!Responsive.isMobile(context))
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: defaultPadding / 2),
-              child: Text("Angelina Jolie"),
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: defaultPadding / 2),
+              child: Text(email),
             ),
           const Icon(Icons.keyboard_arrow_down),
         ],

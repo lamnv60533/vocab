@@ -48,6 +48,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     appService = AppService(widget.sharedPreferences);
+    userService = UserService();
     authService = AuthService();
     authSubscription = authService.onAuthStateChange.listen(onAuthStateChange);
     userInfoSubscription =
