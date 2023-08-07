@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:guide_infra_web_ui/services/auth_service.dart';
 import 'package:guide_infra_web_ui/util/widgets.dart';
 import 'package:provider/provider.dart';
@@ -77,7 +78,7 @@ class _LoginState extends State<Login> {
       // }
       final SERVER_URL = dotenv.env['SERVER_HOST'];
       js.context.callMethod(
-          'open', [ SERVER_URL + '/oauth/login', '_self']);
+          'open', [ '$SERVER_URL/oauth/login', '_self']);
     }
 
     return SafeArea(
