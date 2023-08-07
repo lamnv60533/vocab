@@ -75,8 +75,9 @@ class _LoginState extends State<Login> {
       // } else {
       //   print("form is invalid");
       // }
+      final SERVER_URL = dotenv.env['SERVER_HOST'];
       js.context.callMethod(
-          'open', ['http://localhost:3000/api/v1/oauth/login', '_self']);
+          'open', [ SERVER_URL + '/api/v1/oauth/login', '_self']);
     }
 
     return SafeArea(
