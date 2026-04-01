@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>N3 Vocabulary Learning</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header>
+      <h1>N3 Vocabulary</h1>
+      <nav>
+        <button class="nav-btn active" data-mode="flashcard">Flashcards</button>
+        <button class="nav-btn" data-mode="quiz">Quiz</button>
+        <button class="nav-btn" data-mode="list">Word List</button>
+        <button class="nav-btn" data-mode="stats">Stats</button>
+      </nav>
+    </header>
+
+    <!-- Category Filter -->
+    <div id="category-filter">
+      <label>Category:</label>
+      <select id="category-select">
+        <option value="all">All</option>
+      </select>
+      <span id="word-count"></span>
+    </div>
+
+    <!-- Flashcard Mode -->
+    <section id="flashcard-mode" class="mode active">
+      <div class="flashcard-container">
+        <div class="flashcard" id="flashcard">
+          <div class="flashcard-front">
+            <div class="kanji"></div>
+            <div class="reading"></div>
+          </div>
+          <div class="flashcard-back">
+            <div class="meaning"></div>
+            <div class="example"></div>
+          </div>
+        </div>
+      </div>
+      <p class="hint">Click card to flip</p>
+      <div class="flashcard-controls">
+        <button id="btn-prev" class="control-btn">Previous</button>
+        <span id="card-counter">1 / 100</span>
+        <button id="btn-next" class="control-btn">Next</button>
+      </div>
+      <div class="flashcard-actions">
+        <button id="btn-known" class="action-btn known">I know this</button>
+        <button id="btn-unknown" class="action-btn unknown">Still learning</button>
+        <button id="btn-shuffle" class="action-btn shuffle">Shuffle</button>
+      </div>
+    </section>
+
+    <!-- Quiz Mode -->
+    <section id="quiz-mode" class="mode">
+      <div id="quiz-setup">
+        <h2>Quiz Settings</h2>
+        <div class="quiz-option">
+          <label>Number of questions:</label>
+          <select id="quiz-count">
+            <option value="10">10</option>
+            <option value="20" selected>20</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+        <div class="quiz-option">
+          <label>Question type:</label>
+          <select id="quiz-type">
+            <option value="ja-to-en">Japanese &rarr; English</option>
+            <option value="en-to-ja">English &rarr; Japanese</option>
+            <option value="reading">Reading (Kanji &rarr; Hiragana)</option>
+          </select>
+        </div>
+        <button id="btn-start-quiz" class="primary-btn">Start Quiz</button>
+      </div>
+      <div id="quiz-area" class="hidden">
+        <div id="quiz-progress">
+          <div id="quiz-progress-bar"></div>
+        </div>
+        <div id="quiz-question"></div>
+        <div id="quiz-choices"></div>
+        <div id="quiz-feedback" class="hidden"></div>
+        <button id="btn-next-question" class="primary-btn hidden">Next Question</button>
+      </div>
+      <div id="quiz-results" class="hidden">
+        <h2>Quiz Results</h2>
+        <div id="quiz-score"></div>
+        <div id="quiz-review"></div>
+        <button id="btn-retry-quiz" class="primary-btn">Try Again</button>
+      </div>
+    </section>
+
+    <!-- Word List Mode -->
+    <section id="list-mode" class="mode">
+      <div class="list-controls">
+        <input type="text" id="search-input" placeholder="Search words...">
+        <select id="list-filter">
+          <option value="all">All words</option>
+          <option value="known">Known</option>
+          <option value="unknown">Still learning</option>
+        </select>
+      </div>
+      <div id="word-list"></div>
+    </section>
+
+    <!-- Stats Mode -->
+    <section id="stats-mode" class="mode">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-number" id="stat-total">0</div>
+          <div class="stat-label">Total Words</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="stat-known">0</div>
+          <div class="stat-label">Known</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="stat-learning">0</div>
+          <div class="stat-label">Still Learning</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="stat-percent">0%</div>
+          <div class="stat-label">Progress</div>
+        </div>
+      </div>
+      <div id="progress-chart">
+        <div id="progress-bar-visual">
+          <div id="progress-fill"></div>
+        </div>
+      </div>
+      <div class="stats-actions">
+        <button id="btn-reset-progress" class="action-btn unknown">Reset All Progress</button>
+      </div>
+      <h3>Category Breakdown</h3>
+      <div id="category-stats"></div>
+    </section>
+  </div>
+
+  <script src="vocab-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
