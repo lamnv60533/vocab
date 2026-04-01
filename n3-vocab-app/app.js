@@ -4,6 +4,7 @@ let currentIndex = 0;
 let filteredVocab = [...N3_VOCAB];
 let progress = loadProgress();
 let quizState = null;
+let typingState = { index: 0, correctCount: 0, wrongCount: 0, streak: 0, answered: false };
 
 // DOM Elements
 const flashcard = document.getElementById('flashcard');
@@ -20,6 +21,7 @@ function init() {
   setupCategories();
   setupNavigation();
   setupFlashcard();
+  setupTyping();
   setupQuiz();
   setupWordList();
   setupStats();
@@ -70,7 +72,9 @@ function setupCategories() {
   categorySelect.addEventListener('change', () => {
     applyFilter();
     currentIndex = 0;
+    typingState.index = 0;
     renderFlashcard();
+    if (currentMode === 'typing') renderTypingCard();
     renderWordList();
   });
 }
@@ -95,6 +99,7 @@ function setupNavigation() {
       document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
       document.getElementById(mode + '-mode').classList.add('active');
       currentMode = mode;
+      if (mode === 'typing') renderTypingCard();
       if (mode === 'list') renderWordList();
       if (mode === 'stats') renderStats();
     });
@@ -172,6 +177,121 @@ function renderFlashcard() {
   flashcard.querySelector('.flashcard-back .meaning').textContent = word.meaning;
   flashcard.querySelector('.flashcard-back .example').textContent = word.example;
   cardCounter.textContent = `${currentIndex + 1} / ${filteredVocab.length}`;
+}
+
+// ---- Typing Practice ----
+function setupTyping() {
+  const input = document.getElementById('typing-input');
+  const checkBtn = document.getElementById('btn-typing-check');
+
+  checkBtn.addEventListener('click', checkTypingAnswer);
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      if (typingState.answered) {
+        typingNext();
+      } else {
+        checkTypingAnswer();
+      }
+    }
+  });
+
+  document.getElementById('btn-typing-skip').addEventListener('click', () => {
+    if (!typingState.answered) {
+      typingState.wrongCount++;
+      typingState.streak = 0;
+    }
+    typingNext();
+  });
+
+  document.getElementById('btn-typing-next').addEventListener('click', typingNext);
+
+  document.getElementById('btn-typing-reset').addEventListener('click', () => {
+    typingState = { index: 0, correctCount: 0, wrongCount: 0, streak: 0, answered: false };
+    shuffleArray(filteredVocab);
+    renderTypingCard();
+  });
+}
+
+function renderTypingCard() {
+  if (filteredVocab.length === 0) return;
+  if (typingState.index >= filteredVocab.length) typingState.index = 0;
+
+  const word = filteredVocab[typingState.index];
+  document.getElementById('typing-kanji').textContent = word.kanji;
+  document.getElementById('typing-meaning').textContent = word.meaning;
+
+  const input = document.getElementById('typing-input');
+  input.value = '';
+  input.classList.remove('correct-input', 'wrong-input');
+  input.disabled = false;
+  input.focus();
+
+  document.getElementById('typing-feedback').classList.add('hidden');
+  document.getElementById('typing-answer-reveal').classList.add('hidden');
+  document.getElementById('typing-counter').textContent = `${typingState.index + 1} / ${filteredVocab.length}`;
+
+  document.getElementById('typing-correct-count').textContent = typingState.correctCount;
+  document.getElementById('typing-wrong-count').textContent = typingState.wrongCount;
+  document.getElementById('typing-streak').textContent = typingState.streak;
+
+  typingState.answered = false;
+}
+
+function normalizeReading(str) {
+  return str.replace(/\s+/g, '').trim();
+}
+
+function checkTypingAnswer() {
+  if (typingState.answered) return;
+  if (filteredVocab.length === 0) return;
+
+  const word = filteredVocab[typingState.index];
+  const input = document.getElementById('typing-input');
+  const userAnswer = normalizeReading(input.value);
+  const correctAnswer = normalizeReading(word.reading);
+
+  if (!userAnswer) return;
+
+  typingState.answered = true;
+  input.disabled = true;
+
+  const feedback = document.getElementById('typing-feedback');
+  const reveal = document.getElementById('typing-answer-reveal');
+  feedback.classList.remove('hidden', 'correct', 'wrong');
+  reveal.classList.remove('hidden');
+
+  reveal.querySelector('.typing-correct-answer').textContent = word.reading;
+  reveal.querySelector('.typing-example').textContent = word.example;
+
+  if (userAnswer === correctAnswer) {
+    feedback.classList.add('correct');
+    feedback.textContent = 'Correct!';
+    input.classList.add('correct-input');
+    input.classList.add('pop');
+    typingState.correctCount++;
+    typingState.streak++;
+    setKnown(word, true);
+  } else {
+    feedback.classList.add('wrong');
+    feedback.textContent = `Wrong! You typed: ${userAnswer}`;
+    input.classList.add('wrong-input');
+    input.classList.add('shake');
+    typingState.wrongCount++;
+    typingState.streak = 0;
+  }
+
+  document.getElementById('typing-correct-count').textContent = typingState.correctCount;
+  document.getElementById('typing-wrong-count').textContent = typingState.wrongCount;
+  document.getElementById('typing-streak').textContent = typingState.streak;
+}
+
+function typingNext() {
+  typingState.index++;
+  if (typingState.index >= filteredVocab.length) typingState.index = 0;
+  const input = document.getElementById('typing-input');
+  input.classList.remove('shake', 'pop');
+  renderTypingCard();
 }
 
 // ---- Quiz ----
