@@ -189,7 +189,7 @@ function renderFlashcard() {
   cardCounter.textContent = `${currentIndex + 1} / ${filteredVocab.length}`;
 }
 
-// ---- Romaji to Hiragana ----
+// ---- Romaji to Hiragana (IME-style) ----
 const ROMAJI_MAP = {
   'a':'あ','i':'い','u':'う','e':'え','o':'お',
   'ka':'か','ki':'き','ku':'く','ke':'け','ko':'こ',
@@ -207,9 +207,9 @@ const ROMAJI_MAP = {
   'ba':'ば','bi':'び','bu':'ぶ','be':'べ','bo':'ぼ',
   'pa':'ぱ','pi':'ぴ','pu':'ぷ','pe':'ぺ','po':'ぽ',
   'kya':'きゃ','kyi':'きぃ','kyu':'きゅ','kye':'きぇ','kyo':'きょ',
-  'sha':'しゃ','shi':'し','shu':'しゅ','she':'しぇ','sho':'しょ',
+  'sha':'しゃ','shu':'しゅ','she':'しぇ','sho':'しょ',
   'sya':'しゃ','syu':'しゅ','syo':'しょ',
-  'cha':'ちゃ','chi':'ち','chu':'ちゅ','che':'ちぇ','cho':'ちょ',
+  'cha':'ちゃ','chu':'ちゅ','che':'ちぇ','cho':'ちょ',
   'tya':'ちゃ','tyu':'ちゅ','tyo':'ちょ',
   'nya':'にゃ','nyi':'にぃ','nyu':'にゅ','nye':'にぇ','nyo':'にょ',
   'hya':'ひゃ','hyi':'ひぃ','hyu':'ひゅ','hye':'ひぇ','hyo':'ひょ',
@@ -221,7 +221,6 @@ const ROMAJI_MAP = {
   'bya':'びゃ','byi':'びぃ','byu':'びゅ','bye':'びぇ','byo':'びょ',
   'pya':'ぴゃ','pyi':'ぴぃ','pyu':'ぴゅ','pye':'ぴぇ','pyo':'ぴょ',
   'fa':'ふぁ','fi':'ふぃ','fe':'ふぇ','fo':'ふぉ',
-  'di':'でぃ','du':'どぅ',
   'xa':'ぁ','xi':'ぃ','xu':'ぅ','xe':'ぇ','xo':'ぉ',
   'xya':'ゃ','xyu':'ゅ','xyo':'ょ','xtu':'っ','xtsu':'っ',
   'la':'ぁ','li':'ぃ','lu':'ぅ','le':'ぇ','lo':'ぉ',
@@ -229,48 +228,97 @@ const ROMAJI_MAP = {
   '-':'ー',
 };
 
-// Double consonant -> っ + consonant (e.g. "kk" -> "っk")
-const DOUBLE_CONSONANTS = 'bcdfghjklmnpqrstvwxyz';
+// Check if a string could be the start of a valid romaji sequence
+function couldBeRomaji(s) {
+  if (s === '') return true;
+  for (const key of Object.keys(ROMAJI_MAP)) {
+    if (key.startsWith(s)) return true;
+  }
+  // Double consonant prefix (e.g., "kk" where first k becomes っ)
+  if (s.length === 1 && 'bcdfghjklmpqrstvwxyz'.includes(s)) return true;
+  return false;
+}
 
-function romajiToHiragana(text) {
-  let result = '';
-  let i = 0;
-  const input = text.toLowerCase();
+// IME state: tracks the romaji buffer and converted hiragana
+let imeBuffer = '';    // pending romaji characters
+let imeConverted = ''; // already converted hiragana
 
-  while (i < input.length) {
-    // Handle 'n' before consonant or end (but not before vowel or 'y' or another 'n')
-    if (input[i] === 'n' && i + 1 < input.length && input[i + 1] !== 'a' && input[i + 1] !== 'i' && input[i + 1] !== 'u' && input[i + 1] !== 'e' && input[i + 1] !== 'o' && input[i + 1] !== 'y' && input[i + 1] !== 'n') {
-      result += 'ん';
-      i++;
+function imeReset() {
+  imeBuffer = '';
+  imeConverted = '';
+}
+
+function imeGetDisplay() {
+  return imeConverted + imeBuffer;
+}
+
+function imeFlush() {
+  // Force-convert whatever is in the buffer
+  if (imeBuffer === 'n') {
+    imeConverted += 'ん';
+    imeBuffer = '';
+  } else if (imeBuffer.length > 0) {
+    // Leave unconvertible chars as-is
+    imeConverted += imeBuffer;
+    imeBuffer = '';
+  }
+  return imeConverted;
+}
+
+function imeAddChar(ch) {
+  ch = ch.toLowerCase();
+  imeBuffer += ch;
+
+  // Try to convert from the buffer
+  while (imeBuffer.length > 0) {
+    let converted = false;
+
+    // Handle 'n' followed by non-vowel, non-y, non-n consonant
+    if (imeBuffer.length >= 2 && imeBuffer[0] === 'n' && !'aiueony'.includes(imeBuffer[1])) {
+      imeConverted += 'ん';
+      imeBuffer = imeBuffer.substring(1);
+      converted = true;
       continue;
     }
 
-    // Handle double consonants (っ)
-    if (i + 1 < input.length && input[i] === input[i + 1] && DOUBLE_CONSONANTS.includes(input[i]) && input[i] !== 'n') {
-      result += 'っ';
-      i++;
+    // Handle double consonant -> っ
+    if (imeBuffer.length >= 2 && imeBuffer[0] === imeBuffer[1] && 'bcdfghjklmpqrstvwxyz'.includes(imeBuffer[0])) {
+      imeConverted += 'っ';
+      imeBuffer = imeBuffer.substring(1);
+      converted = true;
       continue;
     }
 
-    // Try matching 4, 3, 2, 1 characters
-    let matched = false;
-    for (let len = 4; len >= 1; len--) {
-      const chunk = input.substring(i, i + len);
+    // Try matching longest romaji first (4, 3, 2, 1)
+    for (let len = Math.min(4, imeBuffer.length); len >= 1; len--) {
+      const chunk = imeBuffer.substring(0, len);
       if (ROMAJI_MAP[chunk]) {
-        result += ROMAJI_MAP[chunk];
-        i += len;
-        matched = true;
+        imeConverted += ROMAJI_MAP[chunk];
+        imeBuffer = imeBuffer.substring(len);
+        converted = true;
         break;
       }
     }
 
-    if (!matched) {
-      result += input[i];
-      i++;
+    if (!converted) {
+      // Check if buffer could still form a valid romaji
+      if (couldBeRomaji(imeBuffer)) {
+        break; // Wait for more input
+      } else {
+        // First char is not convertible, pass it through
+        imeConverted += imeBuffer[0];
+        imeBuffer = imeBuffer.substring(1);
+      }
     }
   }
+}
 
-  return result;
+function imeBackspace() {
+  if (imeBuffer.length > 0) {
+    imeBuffer = imeBuffer.substring(0, imeBuffer.length - 1);
+  } else if (imeConverted.length > 0) {
+    imeConverted = imeConverted.substring(0, imeConverted.length - 1);
+  }
 }
 
 // ---- Typing Practice ----
@@ -280,28 +328,45 @@ function setupTyping() {
 
   checkBtn.addEventListener('click', checkTypingAnswer);
 
-  // Auto-convert romaji to hiragana as user types
-  input.addEventListener('input', () => {
-    if (typingState.answered) return;
-    const pos = input.selectionStart;
-    const original = input.value;
-    const converted = romajiToHiragana(original);
-    if (converted !== original) {
-      input.value = converted;
-      // Adjust cursor position based on length change
-      const diff = original.length - converted.length;
-      input.setSelectionRange(pos - diff, pos - diff);
+  // Intercept keystrokes for IME-style romaji->hiragana conversion
+  input.addEventListener('keydown', (e) => {
+    if (typingState.answered) {
+      if (e.key === 'Enter') {
+        typingNext();
+      }
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      checkTypingAnswer();
+      return;
+    }
+
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      imeBackspace();
+      input.value = imeGetDisplay();
+      return;
+    }
+
+    // Only handle single printable characters
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      imeAddChar(e.key);
+      input.value = imeGetDisplay();
     }
   });
 
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      if (typingState.answered) {
-        typingNext();
-      } else {
-        checkTypingAnswer();
-      }
+  // Prevent direct paste/input that bypasses our IME
+  input.addEventListener('paste', (e) => {
+    e.preventDefault();
+    if (typingState.answered) return;
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    for (const ch of text) {
+      imeAddChar(ch);
     }
+    input.value = imeGetDisplay();
   });
 
   document.getElementById('btn-typing-skip').addEventListener('click', () => {
@@ -330,6 +395,7 @@ function renderTypingCard() {
   document.getElementById('typing-meaning').textContent = word.meaning;
 
   const input = document.getElementById('typing-input');
+  imeReset();
   input.value = '';
   input.classList.remove('correct-input', 'wrong-input');
   input.disabled = false;
@@ -356,7 +422,10 @@ function checkTypingAnswer() {
 
   const word = filteredVocab[typingState.index];
   const input = document.getElementById('typing-input');
-  const userAnswer = normalizeReading(input.value);
+  // Flush any remaining romaji buffer before checking
+  const flushed = imeFlush();
+  input.value = flushed;
+  const userAnswer = normalizeReading(flushed);
   const correctAnswer = normalizeReading(word.reading);
 
   if (!userAnswer) return;
