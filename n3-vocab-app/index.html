@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" translate="no">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
   <title>N3 Vocabulary Learning</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -63,7 +64,7 @@
         <div class="typing-kanji" id="typing-kanji"></div>
         <div class="typing-meaning" id="typing-meaning"></div>
         <div class="typing-input-area">
-          <input type="text" id="typing-input" placeholder="Type hiragana reading..." autocomplete="off" spellcheck="false">
+          <input type="text" id="typing-input" placeholder="Type romaji (e.g. keiken)..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="latin">
           <button id="btn-typing-hint" class="hint-btn" title="Show reading">?</button>
           <button id="btn-typing-check" class="primary-btn">Check</button>
         </div>
