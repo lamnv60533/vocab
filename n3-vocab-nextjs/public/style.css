@@ -91,13 +91,137 @@ header {
   margin-bottom: 24px;
 }
 
+.header-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
 header h1 {
   font-size: 2rem;
   background: linear-gradient(135deg, #ff6b9d, #c44dff, #6e8efb);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  margin-bottom: 0;
+}
+
+.project-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-switcher select {
+  padding: 6px 12px;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  border: 1px solid #444;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.new-project-btn {
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #6e8efb, #c44dff);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.new-project-btn:hover {
+  opacity: 0.85;
+}
+
+/* Speak buttons */
+.flashcard-speak-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  z-index: 20;
+}
+
+.flashcard-speak-btn:hover {
+  background: rgba(110, 142, 251, 0.3);
+}
+
+.speak-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  opacity: 0.5;
+  padding: 2px 6px;
+  transition: opacity 0.2s;
+}
+
+.speak-icon:hover {
+  opacity: 1;
+}
+
+/* Project Word Management */
+.project-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 16px;
+}
+
+.project-section-header h2 {
+  margin-bottom: 0;
+}
+
+.word-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.word-form-grid input {
+  padding: 10px 12px;
+  background: #16213e;
+  color: #e0e0e0;
+  border: 1px solid #333;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.word-form-grid input:focus {
+  outline: none;
+  border-color: #6e8efb;
+}
+
+.word-form-grid input:nth-child(5) {
+  grid-column: 1 / -1;
+}
+
+#project-word-list-section {
+  margin-top: 24px;
+}
+
+#project-word-list-section h3 {
+  margin-bottom: 12px;
+  color: #aaa;
+  font-size: 0.95rem;
 }
 
 nav {
@@ -174,6 +298,7 @@ nav {
   perspective: 1000px;
   margin: 20px auto;
   max-width: 500px;
+  position: relative;
 }
 
 .flashcard {
@@ -233,10 +358,18 @@ nav {
 }
 
 .flashcard-back .example {
-  font-size: 1rem;
+  font-size: 1.5rem;
   color: #888;
   text-align: center;
   line-height: 1.6;
+}
+
+.flashcard-back .example-meaning {
+  font-size: 0.95rem;
+  color: #aaa;
+  text-align: center;
+  font-style: italic;
+  margin-top: 8px;
 }
 
 .hint {
@@ -1012,7 +1145,8 @@ nav {
   background: #333;
 }
 
-#import-textarea {
+#import-textarea,
+#json-import-textarea {
   width: 100%;
   padding: 14px;
   background: #0f0f23;
@@ -1023,9 +1157,12 @@ nav {
   font-family: inherit;
   resize: vertical;
   min-height: 120px;
+  display: block;
+  box-sizing: border-box;
 }
 
-#import-textarea:focus {
+#import-textarea:focus,
+#json-import-textarea:focus {
   outline: none;
   border-color: #6e8efb;
 }

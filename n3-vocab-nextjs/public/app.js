@@ -1,8 +1,86 @@
+// ---- Projects ----
+const N3_PROJECT_ID = 'n3';
+const MIMIKARA_PROJECT_ID = 'mimikara';
+
+const BUILTIN_PROJECTS = [
+  { id: N3_PROJECT_ID, name: 'N3', isBuiltin: true },
+  { id: MIMIKARA_PROJECT_ID, name: 'Mimikara', isBuiltin: true },
+];
+
+function isBuiltinProject(id) {
+  return BUILTIN_PROJECTS.some(p => p.id === id);
+}
+
+function loadCustomProjects() {
+  try { return JSON.parse(localStorage.getItem('vocab-projects')) || []; }
+  catch { return []; }
+}
+
+function saveCustomProjects() {
+  localStorage.setItem('vocab-projects', JSON.stringify(customProjects));
+}
+
+function loadActiveProjectId() {
+  return localStorage.getItem('vocab-active-project') || N3_PROJECT_ID;
+}
+
+function saveActiveProjectId() {
+  localStorage.setItem('vocab-active-project', activeProjectId);
+}
+
+function getActiveProject() {
+  const builtin = BUILTIN_PROJECTS.find(p => p.id === activeProjectId);
+  if (builtin) return builtin;
+  return customProjects.find(p => p.id === activeProjectId) || null;
+}
+
+function createProject(name) {
+  const id = 'proj-' + Date.now();
+  customProjects.push({ id, name, createdAt: Date.now(), words: [] });
+  saveCustomProjects();
+  return id;
+}
+
+function deleteActiveProject() {
+  if (isBuiltinProject(activeProjectId)) return;
+  localStorage.removeItem('vocab-progress-' + activeProjectId);
+  customProjects = customProjects.filter(p => p.id !== activeProjectId);
+  saveCustomProjects();
+  activeProjectId = N3_PROJECT_ID;
+  saveActiveProjectId();
+}
+
+function addWordToActiveProject(word) {
+  const project = customProjects.find(p => p.id === activeProjectId);
+  if (!project) return false;
+  project.words.push(word);
+  saveCustomProjects();
+  return true;
+}
+
+function removeWordFromActiveProject(index) {
+  const project = customProjects.find(p => p.id === activeProjectId);
+  if (!project) return;
+  project.words.splice(index, 1);
+  saveCustomProjects();
+}
+
+function getProjectVocab() {
+  if (activeProjectId === N3_PROJECT_ID) return [...N3_VOCAB, ...importedWords];
+  if (activeProjectId === MIMIKARA_PROJECT_ID) return [...MIMIKARA_VOCAB];
+  const project = customProjects.find(p => p.id === activeProjectId);
+  return project ? [...project.words] : [];
+}
+
+// ---- State ----
+let activeProjectId = loadActiveProjectId();
+let customProjects = loadCustomProjects();
+
 // State
 let currentMode = 'flashcard';
 let currentIndex = 0;
 let importedWords = loadImportedWords();
-let allVocab = [...N3_VOCAB, ...importedWords];
+let allVocab = getProjectVocab();
 let filteredVocab = [...allVocab];
 let progress = loadProgress();
 let quizState = null;
@@ -20,6 +98,7 @@ const listFilter = document.getElementById('list-filter');
 init();
 
 function init() {
+  setupProjectSwitcher();
   setupCategories();
   setupNavigation();
   setupFlashcard();
@@ -28,21 +107,28 @@ function init() {
   setupWordList();
   setupStats();
   setupImport();
+  setupProjectWordManagement();
   applyFilter();
   renderFlashcard();
+  updateImportModeUI();
 }
 
-// ---- Progress (localStorage) ----
+// ---- Progress (localStorage, per-project) ----
+function progressKey() {
+  if (activeProjectId === N3_PROJECT_ID) return 'n3-progress';
+  return 'vocab-progress-' + activeProjectId;
+}
+
 function loadProgress() {
   try {
-    return JSON.parse(localStorage.getItem('n3-progress')) || {};
+    return JSON.parse(localStorage.getItem(progressKey())) || {};
   } catch {
     return {};
   }
 }
 
 function saveProgress() {
-  localStorage.setItem('n3-progress', JSON.stringify(progress));
+  localStorage.setItem(progressKey(), JSON.stringify(progress));
 }
 
 function getWordKey(word) {
@@ -71,7 +157,7 @@ function setupCategories() {
     currentIndex = 0;
     typingState.index = 0;
     renderFlashcard();
-    if (currentMode === 'typing') renderTypingCard();
+    if (currentMode === 'typing') renderTypingCard(false);
     renderWordList();
   });
 }
@@ -112,7 +198,7 @@ function setupNavigation() {
       if (mode === 'typing') {
         shuffleArray(filteredVocab);
         typingState.index = 0;
-        renderTypingCard();
+        renderTypingCard(false);
       }
       if (mode === 'list') renderWordList();
       if (mode === 'stats') renderStats();
@@ -124,6 +210,9 @@ function setupNavigation() {
 function setupFlashcard() {
   flashcard.addEventListener('click', () => {
     flashcard.classList.toggle('flipped');
+    if (flashcard.classList.contains('flipped') && filteredVocab[currentIndex]) {
+      speakWord(filteredVocab[currentIndex].kanji);
+    }
   });
 
   document.getElementById('btn-prev').addEventListener('click', () => {
@@ -159,6 +248,11 @@ function setupFlashcard() {
     renderFlashcard();
   });
 
+  document.getElementById('btn-speak').addEventListener('click', () => {
+    if (filteredVocab.length === 0) return;
+    speakWord(filteredVocab[currentIndex].kanji);
+  });
+
   // Keyboard navigation
   document.addEventListener('keydown', (e) => {
     if (currentMode !== 'flashcard') return;
@@ -190,6 +284,7 @@ function renderFlashcard() {
   flashcard.querySelector('.flashcard-front .reading').textContent = word.reading;
   flashcard.querySelector('.flashcard-back .meaning').textContent = word.meaning;
   flashcard.querySelector('.flashcard-back .example').textContent = word.example;
+  flashcard.querySelector('.flashcard-back .example-meaning').textContent = word.exampleMeaning || '';
   cardCounter.textContent = `${currentIndex + 1} / ${filteredVocab.length}`;
 }
 
@@ -416,11 +511,11 @@ function setupTyping() {
   document.getElementById('btn-typing-reset').addEventListener('click', () => {
     typingState = { index: 0, correctCount: 0, wrongCount: 0, streak: 0, hintCount: 0, answered: false, hintUsed: false };
     shuffleArray(filteredVocab);
-    renderTypingCard();
+    renderTypingCard(false);
   });
 }
 
-function renderTypingCard() {
+function renderTypingCard(speak = true) {
   if (filteredVocab.length === 0) return;
   if (typingState.index >= filteredVocab.length) typingState.index = 0;
 
@@ -441,6 +536,7 @@ function renderTypingCard() {
   document.getElementById('btn-typing-hint').classList.remove('used');
   typingState.hintUsed = false;
   document.getElementById('typing-counter').textContent = `${typingState.index + 1} / ${filteredVocab.length}`;
+  if (speak) speakWord(word.kanji);
 
   document.getElementById('typing-correct-count').textContent = typingState.correctCount;
   document.getElementById('typing-wrong-count').textContent = typingState.wrongCount;
@@ -515,7 +611,7 @@ function typingNext() {
   if (typingState.index >= filteredVocab.length) typingState.index = 0;
   const input = document.getElementById('typing-input');
   input.classList.remove('shake', 'pop');
-  renderTypingCard();
+  renderTypingCard(false);
 }
 
 // ---- Quiz ----
@@ -685,10 +781,14 @@ function renderWordList() {
     div.innerHTML = `
       <div class="word-ja">${word.kanji}<small>${word.reading}</small></div>
       <div class="word-en">${word.meaning}</div>
+      <button class="speak-icon" data-word="${word.kanji}" title="Speak">🔊</button>
       <span class="word-status ${known ? 'known' : 'learning'}" data-key="${getWordKey(word)}">
         ${known ? 'Known' : 'Learning'}
       </span>
     `;
+    div.querySelector('.speak-icon').addEventListener('click', (e) => {
+      speakWord(e.currentTarget.dataset.word);
+    });
     div.querySelector('.word-status').addEventListener('click', (e) => {
       const key = e.target.dataset.key;
       const w = allVocab.find(v => getWordKey(v) === key);
@@ -761,7 +861,7 @@ function saveImportedWords() {
 }
 
 function rebuildVocab() {
-  allVocab = [...N3_VOCAB, ...importedWords];
+  allVocab = getProjectVocab();
   refreshCategoryOptions();
   applyFilter();
   currentIndex = 0;
@@ -932,6 +1032,214 @@ function renderImportedSets() {
     });
     listEl.appendChild(div);
   });
+}
+
+// ---- Project Switcher ----
+function setupProjectSwitcher() {
+  refreshProjectSelect();
+  updateProjectTitle();
+
+  document.getElementById('project-select').addEventListener('change', (e) => {
+    activeProjectId = e.target.value;
+    saveActiveProjectId();
+    progress = loadProgress();
+    rebuildVocab();
+    typingState.index = 0;
+    currentIndex = 0;
+    if (currentMode === 'list') renderWordList();
+    if (currentMode === 'stats') renderStats();
+    updateProjectTitle();
+    updateImportModeUI();
+  });
+
+  document.getElementById('btn-new-project').addEventListener('click', () => {
+    const name = prompt('Enter project name:');
+    if (!name || !name.trim()) return;
+    const id = createProject(name.trim());
+    activeProjectId = id;
+    saveActiveProjectId();
+    progress = loadProgress();
+    refreshProjectSelect();
+    rebuildVocab();
+    typingState.index = 0;
+    currentIndex = 0;
+    updateProjectTitle();
+    updateImportModeUI();
+    // Switch to import tab so user can start adding words
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-mode="import"]').classList.add('active');
+    document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
+    document.getElementById('import-mode').classList.add('active');
+    currentMode = 'import';
+  });
+}
+
+function refreshProjectSelect() {
+  const sel = document.getElementById('project-select');
+  sel.innerHTML = '';
+  BUILTIN_PROJECTS.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name + ' (Built-in)';
+    sel.appendChild(opt);
+  });
+  customProjects.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+  sel.value = activeProjectId;
+}
+
+function updateProjectTitle() {
+  const project = getActiveProject();
+  const name = project ? project.name : 'N3';
+  document.getElementById('app-title').textContent = name + ' Vocabulary';
+}
+
+function updateImportModeUI() {
+  const isBuiltin = isBuiltinProject(activeProjectId);
+  document.getElementById('quizlet-import-section').style.display = isBuiltin ? '' : 'none';
+  document.getElementById('project-words-section').style.display = isBuiltin ? 'none' : '';
+  if (!isBuiltin) {
+    const project = getActiveProject();
+    if (project) {
+      document.getElementById('project-words-title').textContent = project.name + ' — Words';
+    }
+    renderProjectWordList();
+  }
+}
+
+// ---- Project Word Management ----
+function setupProjectWordManagement() {
+  document.getElementById('btn-delete-project').addEventListener('click', () => {
+    const project = getActiveProject();
+    if (!project || isBuiltinProject(activeProjectId)) return;
+    if (!confirm(`Delete project "${project.name}" and all its words?`)) return;
+    deleteActiveProject();
+    refreshProjectSelect();
+    progress = loadProgress();
+    rebuildVocab();
+    updateProjectTitle();
+    updateImportModeUI();
+  });
+
+  document.getElementById('btn-add-word').addEventListener('click', () => {
+    const kanji = document.getElementById('word-kanji').value.trim();
+    const reading = document.getElementById('word-reading').value.trim();
+    const meaning = document.getElementById('word-meaning').value.trim();
+    const example = document.getElementById('word-example').value.trim();
+    const category = document.getElementById('word-category').value.trim() || 'custom';
+    const resultEl = document.getElementById('add-word-result');
+
+    if (!kanji || !meaning) {
+      resultEl.className = 'error';
+      resultEl.textContent = 'Word and Meaning are required.';
+      resultEl.classList.remove('hidden');
+      return;
+    }
+
+    addWordToActiveProject({ kanji, reading, meaning, example, category });
+    ['word-kanji', 'word-reading', 'word-meaning', 'word-example', 'word-category'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    resultEl.className = 'success';
+    resultEl.textContent = `"${kanji}" added!`;
+    resultEl.classList.remove('hidden');
+    setTimeout(() => resultEl.classList.add('hidden'), 2000);
+
+    rebuildVocab();
+    renderProjectWordList();
+    document.getElementById('word-kanji').focus();
+  });
+
+  document.getElementById('btn-json-import').addEventListener('click', () => {
+    const text = document.getElementById('json-import-textarea').value.trim();
+    const resultEl = document.getElementById('json-import-result');
+
+    if (!text) {
+      resultEl.className = 'error';
+      resultEl.textContent = 'Please paste JSON first.';
+      resultEl.classList.remove('hidden');
+      return;
+    }
+
+    let words;
+    try {
+      words = JSON.parse(text);
+      if (!Array.isArray(words)) throw new Error('Expected a JSON array [ ... ]');
+    } catch (e) {
+      resultEl.className = 'error';
+      resultEl.textContent = 'Invalid JSON: ' + e.message;
+      resultEl.classList.remove('hidden');
+      return;
+    }
+
+    const valid = words.filter(w => w && w.kanji && w.meaning);
+    if (valid.length === 0) {
+      resultEl.className = 'error';
+      resultEl.textContent = 'No valid words found. Each item needs "kanji" and "meaning" fields.';
+      resultEl.classList.remove('hidden');
+      return;
+    }
+
+    valid.forEach(w => addWordToActiveProject({
+      kanji: String(w.kanji),
+      reading: String(w.reading || ''),
+      meaning: String(w.meaning),
+      example: String(w.example || ''),
+      category: String(w.category || 'custom'),
+    }));
+
+    resultEl.className = 'success';
+    resultEl.textContent = `Imported ${valid.length} word${valid.length > 1 ? 's' : ''}!`;
+    resultEl.classList.remove('hidden');
+    document.getElementById('json-import-textarea').value = '';
+
+    rebuildVocab();
+    renderProjectWordList();
+  });
+}
+
+function renderProjectWordList() {
+  const project = customProjects.find(p => p.id === activeProjectId);
+  if (!project) return;
+
+  document.getElementById('project-word-count').textContent = project.words.length;
+  const listEl = document.getElementById('project-word-list');
+  listEl.innerHTML = '';
+
+  if (project.words.length === 0) {
+    listEl.innerHTML = '<p style="color:#555;font-size:0.9rem;">No words yet. Add some above.</p>';
+    return;
+  }
+
+  project.words.forEach((word, index) => {
+    const div = document.createElement('div');
+    div.className = 'word-item';
+    div.innerHTML = `
+      <div class="word-ja">${word.kanji}<small>${word.reading ? ' ' + word.reading : ''}</small></div>
+      <div class="word-en">${word.meaning}</div>
+      <button class="imported-set-delete" data-index="${index}" title="Remove word">✕</button>
+    `;
+    div.querySelector('.imported-set-delete').addEventListener('click', () => {
+      removeWordFromActiveProject(index);
+      rebuildVocab();
+      renderProjectWordList();
+    });
+    listEl.appendChild(div);
+  });
+}
+
+// ---- Text-to-Speech ----
+function speakWord(text) {
+  if (!text || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'ja-JP';
+  utterance.rate = 0.85;
+  window.speechSynthesis.speak(utterance);
 }
 
 // ---- Utility ----

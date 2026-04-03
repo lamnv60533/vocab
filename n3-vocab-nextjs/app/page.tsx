@@ -40,8 +40,10 @@ export default function Home() {
               <div className="flashcard-back">
                 <div className="meaning"></div>
                 <div className="example"></div>
+                <div className="example-meaning"></div>
               </div>
             </div>
+            <button id="btn-speak" className="flashcard-speak-btn" title="Speak word">🔊</button>
           </div>
           <p className="hint">Click card to flip</p>
           <div className="flashcard-controls">
@@ -180,6 +182,47 @@ export default function Home() {
         </section>
 
         <section id="import-mode" className="mode">
+          {/* Custom project word management — shown when a custom project is active */}
+          <div className="import-section" id="project-words-section" style={{ display: "none" }}>
+            <div className="project-section-header">
+              <h2 id="project-words-title">Project Words</h2>
+              <button id="btn-delete-project" className="action-btn unknown">Delete Project</button>
+            </div>
+
+            <div className="import-method">
+              <h3>Add a Word</h3>
+              <div className="word-form-grid">
+                <input type="text" id="word-kanji" placeholder="Word / Term *" />
+                <input type="text" id="word-reading" placeholder="Reading (e.g. hiragana)" />
+                <input type="text" id="word-meaning" placeholder="Meaning / Definition *" />
+                <input type="text" id="word-example" placeholder="Example sentence" />
+                <input type="text" id="word-category" placeholder="Category (default: custom)" />
+              </div>
+              <button id="btn-add-word" className="primary-btn">Add Word</button>
+              <div id="add-word-result" className="hidden"></div>
+            </div>
+
+            <div className="import-divider"><span>or</span></div>
+
+            <div className="import-method">
+              <h3>Import JSON Array</h3>
+              <p className="import-hint">
+                Paste an array of word objects. Required fields: <code>kanji</code>, <code>meaning</code>.
+                Optional: <code>reading</code>, <code>example</code>, <code>category</code>.
+              </p>
+              <textarea id="json-import-textarea" rows={6} placeholder={`[\n  {"kanji": "勉強", "reading": "べんきょう", "meaning": "study", "example": "毎日勉強する"},\n  {"kanji": "apple", "meaning": "りんご"}\n]`}></textarea>
+              <button id="btn-json-import" className="primary-btn">Import JSON</button>
+              <div id="json-import-result" className="hidden"></div>
+            </div>
+
+            <div id="project-word-list-section">
+              <h3>Words in Project (<span id="project-word-count">0</span>)</h3>
+              <div id="project-word-list"></div>
+            </div>
+          </div>
+
+          {/* Quizlet import — shown when N3 project is active */}
+          <div id="quizlet-import-section">
           <div className="import-section">
             <h2>Import JSON Array</h2>
             <p className="import-desc">Paste a JSON array of flashcards. Each object needs <code>kanji</code>, <code>reading</code>, <code>meaning</code> fields. Optional: <code>example</code>, <code>category</code>.</p>
@@ -233,10 +276,12 @@ export default function Home() {
             <div id="imported-sets-list"></div>
             <button id="btn-clear-imports" className="action-btn unknown hidden">Clear All Imported Words</button>
           </div>
+          </div> {/* end quizlet-import-section */}
         </section>
       </div>
 
       <Script src="/vocab-data.js" strategy="beforeInteractive" />
+      <Script src="/mimikara-data.js" strategy="beforeInteractive" />
       <Script src="/app.js" strategy="afterInteractive" />
     </>
   );
