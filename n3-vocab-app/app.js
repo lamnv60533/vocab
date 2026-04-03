@@ -109,7 +109,11 @@ function setupNavigation() {
       document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
       document.getElementById(mode + '-mode').classList.add('active');
       currentMode = mode;
-      if (mode === 'typing') renderTypingCard();
+      if (mode === 'typing') {
+        shuffleArray(filteredVocab);
+        typingState.index = 0;
+        renderTypingCard();
+      }
       if (mode === 'list') renderWordList();
       if (mode === 'stats') renderStats();
     });
@@ -331,7 +335,7 @@ function setupTyping() {
   // Intercept keystrokes for IME-style romaji->hiragana conversion
   input.addEventListener('keydown', (e) => {
     if (typingState.answered) {
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' && Date.now() - typingState.answeredAt > 300) {
         typingNext();
       }
       return;
@@ -362,7 +366,7 @@ function setupTyping() {
   document.addEventListener('keydown', (e) => {
     if (currentMode !== 'typing') return;
     if (e.target.tagName === 'TEXTAREA' || (e.target.tagName === 'INPUT' && e.target.id !== 'typing-input')) return;
-    if (typingState.answered && e.key === 'Enter') {
+    if (typingState.answered && e.key === 'Enter' && Date.now() - typingState.answeredAt > 300) {
       e.preventDefault();
       typingNext();
     }
@@ -471,6 +475,7 @@ function checkTypingAnswer() {
   if (userAnswer === correctAnswer) {
     // Correct — lock input, show answer, Enter to advance
     typingState.answered = true;
+    typingState.answeredAt = Date.now();
     input.readOnly = true;
     reveal.classList.remove('hidden');
     reveal.querySelector('.typing-correct-answer').textContent = word.reading;
