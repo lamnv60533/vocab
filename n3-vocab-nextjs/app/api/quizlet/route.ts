@@ -20,21 +20,27 @@ export async function GET(request: NextRequest) {
   }
 
   const setId = match[1];
+  const headers = {
+    'User-Agent':
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    Accept: 'application/json, text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9,ja;q=0.8',
+  };
 
   try {
-    const { data: html } = await axios.get(`https://quizlet.com/${setId}`, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9,ja;q=0.8',
-      },
-      timeout: 15000,
-    });
+    // Method 1: Try Quizlet internal webapi (returns clean JSON)
+    let cards = await fetchViaWebApi(setId, headers);
 
-    let cards = parseJsonLd(html);
-    if (cards.length === 0) cards = parseNextData(html);
-    if (cards.length === 0) cards = parseRegex(html);
+    // Method 2: Scrape HTML page and parse
+    if (cards.length === 0) {
+      const { data: html } = await axios.get(`https://quizlet.com/${setId}`, {
+        headers,
+        timeout: 15000,
+      });
+      cards = parseJsonLd(html);
+      if (cards.length === 0) cards = parseNextData(html);
+      if (cards.length === 0) cards = parseRegex(html);
+    }
 
     if (cards.length === 0) {
       return NextResponse.json({
@@ -53,6 +59,32 @@ export async function GET(request: NextRequest) {
       cards: [],
     });
   }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function fetchViaWebApi(setId: string, headers: Record<string, string>): Promise<Card[]> {
+  const cards: Card[] = [];
+  try {
+    const apiUrl = `https://quizlet.com/webapi/3.4/studiable-item-documents?filters%5BstudiableContainerId%5D=${setId}&filters%5BstudiableContainerType%5D=1&perPage=1000&page=1`;
+    const { data } = await axios.get(apiUrl, { headers, timeout: 10000 });
+
+    const items = data?.responses?.[0]?.models?.studiableItem;
+    if (Array.isArray(items)) {
+      for (const item of items) {
+        const cardSides = item.cardSides;
+        if (Array.isArray(cardSides) && cardSides.length >= 2) {
+          const term = cardSides[0]?.media?.[0]?.plainText || '';
+          const definition = cardSides[1]?.media?.[0]?.plainText || '';
+          if (term && definition) {
+            cards.push({ term, definition });
+          }
+        }
+      }
+    }
+  } catch {
+    // webapi may return 403/401, fall through to HTML scraping
+  }
+  return cards;
 }
 
 interface Card {
