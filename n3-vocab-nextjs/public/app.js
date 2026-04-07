@@ -1,11 +1,20 @@
 // ---- Projects ----
 const N3_PROJECT_ID = 'n3';
 const MIMIKARA_PROJECT_ID = 'mimikara';
+const VERB_PROJECT_ID = 'verb';
+const N4_PROJECT_ID = 'n4';
 
 const BUILTIN_PROJECTS = [
   { id: N3_PROJECT_ID, name: 'N3', isBuiltin: true },
   { id: MIMIKARA_PROJECT_ID, name: 'Mimikara', isBuiltin: true },
+  { id: VERB_PROJECT_ID, name: 'Động từ', isBuiltin: true },
+  { id: N4_PROJECT_ID, name: 'N4 (Bài 26-50)', isBuiltin: true, lessonBased: true },
 ];
+
+function isLessonBasedProject(id) {
+  const p = BUILTIN_PROJECTS.find(p => p.id === id);
+  return p && p.lessonBased;
+}
 
 function isBuiltinProject(id) {
   return BUILTIN_PROJECTS.some(p => p.id === id);
@@ -66,15 +75,30 @@ function removeWordFromActiveProject(index) {
 }
 
 function getProjectVocab() {
-  if (activeProjectId === N3_PROJECT_ID) return [...N3_VOCAB, ...importedWords];
-  if (activeProjectId === MIMIKARA_PROJECT_ID) return [...MIMIKARA_VOCAB];
-  const project = customProjects.find(p => p.id === activeProjectId);
-  return project ? [...project.words] : [];
+  return getProjectVocabById(activeProjectId);
 }
 
 // ---- State ----
 let activeProjectId = loadActiveProjectId();
 let customProjects = loadCustomProjects();
+
+// ---- Lessons ----
+const DEFAULT_LESSON_SIZE = 30;
+let activeLessonIndex = 'all';
+let expandedProjects = new Set([loadActiveProjectId()]);
+
+function getLessonSizeForProject(id) {
+  return parseInt(localStorage.getItem('vocab-lesson-size-' + id)) || DEFAULT_LESSON_SIZE;
+}
+
+function getProjectVocabById(id) {
+  if (id === N3_PROJECT_ID) return [...N3_VOCAB, ...importedWords];
+  if (id === MIMIKARA_PROJECT_ID) return [...MIMIKARA_VOCAB];
+  if (id === VERB_PROJECT_ID) return [...VERB_VOCAB];
+  if (id === N4_PROJECT_ID) return [...N4_VOCAB];
+  const project = customProjects.find(p => p.id === id);
+  return project ? [...project.words] : [];
+}
 
 // State
 let currentMode = 'flashcard';
@@ -85,6 +109,7 @@ let filteredVocab = [...allVocab];
 let progress = loadProgress();
 let quizState = null;
 let typingState = { index: 0, correctCount: 0, wrongCount: 0, streak: 0, hintCount: 0, answered: false, hintUsed: false };
+let typingFirstLetterEnabled = localStorage.getItem('vocab-typing-first-letter') === 'true';
 
 // DOM Elements
 const flashcard = document.getElementById('flashcard');
@@ -98,7 +123,7 @@ const listFilter = document.getElementById('list-filter');
 init();
 
 function init() {
-  setupProjectSwitcher();
+  setupSidebar();
   setupCategories();
   setupNavigation();
   setupFlashcard();
@@ -149,6 +174,234 @@ function setKnown(word, known) {
   saveProgress();
 }
 
+// ---- Review List (per-project) ----
+function reviewKeyForProject(id) { return 'vocab-review-' + id; }
+
+function loadReviewListForProject(id) {
+  try { return new Set(JSON.parse(localStorage.getItem(reviewKeyForProject(id))) || []); }
+  catch { return new Set(); }
+}
+
+function saveReviewList() {
+  localStorage.setItem(reviewKeyForProject(activeProjectId), JSON.stringify([...reviewList]));
+}
+
+function addToReview(word) {
+  reviewList.add(getWordKey(word));
+  saveReviewList();
+}
+
+function removeFromReview(word) {
+  reviewList.delete(getWordKey(word));
+  saveReviewList();
+}
+
+function isInReview(word) {
+  return reviewList.has(getWordKey(word));
+}
+
+let reviewList = loadReviewListForProject(loadActiveProjectId());
+
+// ---- Sidebar ----
+function setupSidebar() {
+  renderSidebar();
+  updateProjectTitle();
+
+  document.getElementById('btn-new-project').addEventListener('click', () => {
+    const name = prompt('Enter project name:');
+    if (!name || !name.trim()) return;
+    const id = createProject(name.trim());
+    activeProjectId = id;
+    saveActiveProjectId();
+    progress = loadProgress();
+    activeLessonIndex = 'all';
+    expandedProjects.add(id);
+    rebuildVocab();
+    updateProjectTitle();
+    updateImportModeUI();
+    // Switch to import tab
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-mode="import"]').classList.add('active');
+    document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
+    document.getElementById('import-mode').classList.add('active');
+    currentMode = 'import';
+    closeSidebar();
+  });
+
+  document.getElementById('btn-sidebar-toggle').addEventListener('click', openSidebar);
+  document.getElementById('btn-sidebar-close').addEventListener('click', closeSidebar);
+  document.getElementById('sidebar-overlay').addEventListener('click', closeSidebar);
+}
+
+function renderSidebar() {
+  const content = document.getElementById('sidebar-content');
+  content.innerHTML = '';
+  const allProjects = [...BUILTIN_PROJECTS, ...customProjects];
+
+  allProjects.forEach(project => {
+    const isActive = project.id === activeProjectId;
+    const isExpanded = expandedProjects.has(project.id);
+    const vocab = getProjectVocabById(project.id);
+    const pLessonSize = getLessonSizeForProject(project.id);
+    const numLessons = Math.ceil(vocab.length / pLessonSize);
+
+    const projectDiv = document.createElement('div');
+    projectDiv.className = 'sb-project' + (isActive ? ' active' : '');
+
+    // Header row
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'sb-project-header';
+    headerDiv.innerHTML = `
+      <span class="sb-project-arrow">${isExpanded ? '▾' : '▸'}</span>
+      <span class="sb-project-name">${project.name}</span>
+      <span class="sb-project-count">${vocab.length}</span>
+      ${!project.isBuiltin ? '<button class="sb-project-delete" title="Delete project">×</button>' : ''}
+    `;
+    headerDiv.addEventListener('click', (e) => {
+      if (e.target.classList.contains('sb-project-delete')) return;
+      if (expandedProjects.has(project.id) && isActive) {
+        expandedProjects.delete(project.id);
+        renderSidebar();
+        return;
+      }
+      expandedProjects.add(project.id);
+      switchToProject(project.id, 'all');
+    });
+    const deleteBtn = headerDiv.querySelector('.sb-project-delete');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const p = customProjects.find(x => x.id === project.id);
+        if (!p || !confirm(`Delete project "${p.name}"?`)) return;
+        const wasActive = activeProjectId === project.id;
+        localStorage.removeItem('vocab-progress-' + project.id);
+        customProjects = customProjects.filter(x => x.id !== project.id);
+        saveCustomProjects();
+        expandedProjects.delete(project.id);
+        if (wasActive) {
+          activeProjectId = N3_PROJECT_ID;
+          saveActiveProjectId();
+          progress = loadProgress();
+          activeLessonIndex = 'all';
+          expandedProjects.add(N3_PROJECT_ID);
+          rebuildVocab();
+          updateProjectTitle();
+          updateImportModeUI();
+        } else {
+          renderSidebar();
+        }
+      });
+    }
+
+    // Lessons area
+    const lessonsDiv = document.createElement('div');
+    lessonsDiv.className = 'sb-lessons' + (isExpanded ? ' open' : '');
+
+    if (isExpanded) {
+      // All
+      const allItem = document.createElement('div');
+      allItem.className = 'sb-lesson' + (isActive && activeLessonIndex === 'all' ? ' active' : '');
+      allItem.textContent = `All  (${vocab.length})`;
+      allItem.addEventListener('click', () => switchToProject(project.id, 'all'));
+      lessonsDiv.appendChild(allItem);
+
+      // Review lesson
+      const reviewCount = loadReviewListForProject(project.id).size;
+      if (reviewCount > 0) {
+        const reviewItem = document.createElement('div');
+        reviewItem.className = 'sb-lesson sb-lesson-review' + (isActive && activeLessonIndex === 'review' ? ' active' : '');
+        reviewItem.textContent = `Review  (${reviewCount})`;
+        reviewItem.addEventListener('click', () => switchToProject(project.id, 'review'));
+        lessonsDiv.appendChild(reviewItem);
+      }
+
+      // Individual lessons
+      if (project.lessonBased) {
+        // Group by category (lesson-26, lesson-27, ...)
+        const cats = [...new Set(vocab.map(w => w.category).filter(Boolean))].sort((a, b) => {
+          const na = parseInt(a.replace(/\D/g, '')) || 0;
+          const nb = parseInt(b.replace(/\D/g, '')) || 0;
+          return na - nb;
+        });
+        cats.forEach(cat => {
+          const count = vocab.filter(w => w.category === cat).length;
+          const lessonNum = cat.replace('lesson-', '');
+          const item = document.createElement('div');
+          item.className = 'sb-lesson' + (isActive && activeLessonIndex === cat ? ' active' : '');
+          item.textContent = `Bài ${lessonNum}  (${count})`;
+          item.addEventListener('click', () => switchToProject(project.id, cat));
+          lessonsDiv.appendChild(item);
+        });
+      } else {
+        for (let i = 0; i < numLessons; i++) {
+          const start = i * pLessonSize + 1;
+          const end = Math.min((i + 1) * pLessonSize, vocab.length);
+          const item = document.createElement('div');
+          item.className = 'sb-lesson' + (isActive && activeLessonIndex === i ? ' active' : '');
+          item.textContent = `Lesson ${i + 1}  ${start}–${end}`;
+          item.addEventListener('click', () => switchToProject(project.id, i));
+          lessonsDiv.appendChild(item);
+        }
+
+        // Lesson size config
+        const sizeRow = document.createElement('div');
+        sizeRow.className = 'sb-lesson-size-row';
+        sizeRow.innerHTML = `<label>Words/lesson</label><input type="number" min="1" value="${pLessonSize}" class="sb-lesson-size-input" />`;
+        sizeRow.querySelector('input').addEventListener('change', (e) => {
+          const size = Math.max(1, parseInt(e.target.value) || DEFAULT_LESSON_SIZE);
+          e.target.value = size;
+          localStorage.setItem('vocab-lesson-size-' + project.id, String(size));
+          if (project.id === activeProjectId) {
+            activeLessonIndex = 'all';
+            applyFilter();
+            currentIndex = 0;
+            renderFlashcard();
+          }
+          renderSidebar();
+        });
+        lessonsDiv.appendChild(sizeRow);
+      }
+    }
+
+    projectDiv.appendChild(headerDiv);
+    projectDiv.appendChild(lessonsDiv);
+    content.appendChild(projectDiv);
+  });
+}
+
+function switchToProject(projectId, lessonIndex) {
+  if (projectId !== activeProjectId) {
+    activeProjectId = projectId;
+    saveActiveProjectId();
+    progress = loadProgress();
+    reviewList = loadReviewListForProject(projectId);
+    allVocab = getProjectVocabById(projectId);
+    refreshCategoryOptions();
+    updateProjectTitle();
+    updateImportModeUI();
+  }
+  activeLessonIndex = lessonIndex;
+  applyFilter();
+  currentIndex = 0;
+  typingState.index = 0;
+  renderFlashcard();
+  if (currentMode === 'typing') renderTypingCard(false);
+  if (currentMode === 'list') renderWordList();
+  if (currentMode === 'stats') renderStats();
+  renderSidebar();
+  closeSidebar();
+}
+
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').classList.add('open');
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+
 // ---- Categories ----
 function setupCategories() {
   refreshCategoryOptions();
@@ -181,7 +434,20 @@ function formatCategory(cat) {
 
 function applyFilter() {
   const cat = categorySelect.value;
-  filteredVocab = cat === 'all' ? [...allVocab] : allVocab.filter(w => w.category === cat);
+  let base = [...allVocab];
+
+  if (activeLessonIndex === 'review') {
+    base = base.filter(w => reviewList.has(getWordKey(w)));
+  } else if (activeLessonIndex !== 'all') {
+    if (isLessonBasedProject(activeProjectId)) {
+      base = base.filter(w => w.category === activeLessonIndex);
+    } else {
+      const lessonSize = getLessonSizeForProject(activeProjectId);
+      base = base.slice(activeLessonIndex * lessonSize, (activeLessonIndex + 1) * lessonSize);
+    }
+  }
+
+  filteredVocab = cat === 'all' ? base : base.filter(w => w.category === cat);
   wordCount.textContent = `${filteredVocab.length} words`;
 }
 
@@ -508,11 +774,76 @@ function setupTyping() {
 
   document.getElementById('btn-typing-next').addEventListener('click', typingNext);
 
+  // Float controls above keyboard on mobile
+  const typingControls = document.querySelector('.typing-controls');
+  function updateControlsPosition() {
+    if (!window.visualViewport || !typingControls) return;
+    const keyboardHeight = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
+    if (keyboardHeight > 100 && document.activeElement === input) {
+      typingControls.style.position = 'fixed';
+      typingControls.style.bottom = keyboardHeight + 'px';
+      typingControls.style.left = '0';
+      typingControls.style.right = '0';
+      typingControls.style.zIndex = '200';
+      typingControls.style.background = '#0d0d20';
+      typingControls.style.borderTop = '1px solid #1a1a2e';
+      typingControls.style.margin = '0';
+      typingControls.style.padding = '10px 16px';
+    } else {
+      typingControls.removeAttribute('style');
+    }
+  }
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', updateControlsPosition);
+    window.visualViewport.addEventListener('scroll', updateControlsPosition);
+  }
+  input.addEventListener('blur', () => setTimeout(() => typingControls && typingControls.removeAttribute('style'), 100));
+
   document.getElementById('btn-typing-reset').addEventListener('click', () => {
     typingState = { index: 0, correctCount: 0, wrongCount: 0, streak: 0, hintCount: 0, answered: false, hintUsed: false };
     shuffleArray(filteredVocab);
     renderTypingCard(false);
   });
+
+  const firstLetterToggle = document.getElementById('btn-first-letter-toggle');
+  firstLetterToggle.classList.toggle('active', typingFirstLetterEnabled);
+  firstLetterToggle.addEventListener('click', () => {
+    typingFirstLetterEnabled = !typingFirstLetterEnabled;
+    localStorage.setItem('vocab-typing-first-letter', typingFirstLetterEnabled);
+    firstLetterToggle.classList.toggle('active', typingFirstLetterEnabled);
+    if (filteredVocab.length > 0) updateFirstLetterHint(filteredVocab[typingState.index]);
+  });
+
+  document.getElementById('btn-save-review').addEventListener('click', () => {
+    if (filteredVocab.length === 0) return;
+    const word = filteredVocab[typingState.index];
+    if (isInReview(word)) {
+      removeFromReview(word);
+    } else {
+      addToReview(word);
+    }
+    updateSaveReviewBtn(word);
+    renderSidebar();
+  });
+}
+
+function updateFirstLetterHint(word) {
+  const el = document.getElementById('typing-first-letter');
+  if (!el) return;
+  if (typingFirstLetterEnabled && word.reading) {
+    el.textContent = word.reading[0] + '_'.repeat(Math.max(0, word.reading.length - 1));
+    el.classList.remove('hidden');
+  } else {
+    el.classList.add('hidden');
+  }
+}
+
+function updateSaveReviewBtn(word) {
+  const btn = document.getElementById('btn-save-review');
+  if (!btn) return;
+  const saved = isInReview(word);
+  btn.textContent = saved ? '✓ Saved for Review' : 'Save for Review';
+  btn.classList.toggle('saved', saved);
 }
 
 function renderTypingCard(speak = true) {
@@ -543,6 +874,8 @@ function renderTypingCard(speak = true) {
   document.getElementById('typing-streak').textContent = typingState.streak;
   document.getElementById('typing-hint-count').textContent = typingState.hintCount;
 
+  updateSaveReviewBtn(word);
+  updateFirstLetterHint(word);
   typingState.answered = false;
 }
 
@@ -862,10 +1195,13 @@ function saveImportedWords() {
 
 function rebuildVocab() {
   allVocab = getProjectVocab();
+  reviewList = loadReviewListForProject(activeProjectId);
+  activeLessonIndex = 'all';
   refreshCategoryOptions();
   applyFilter();
   currentIndex = 0;
   renderFlashcard();
+  renderSidebar();
 }
 
 function setupImport() {
@@ -1034,63 +1370,6 @@ function renderImportedSets() {
   });
 }
 
-// ---- Project Switcher ----
-function setupProjectSwitcher() {
-  refreshProjectSelect();
-  updateProjectTitle();
-
-  document.getElementById('project-select').addEventListener('change', (e) => {
-    activeProjectId = e.target.value;
-    saveActiveProjectId();
-    progress = loadProgress();
-    rebuildVocab();
-    typingState.index = 0;
-    currentIndex = 0;
-    if (currentMode === 'list') renderWordList();
-    if (currentMode === 'stats') renderStats();
-    updateProjectTitle();
-    updateImportModeUI();
-  });
-
-  document.getElementById('btn-new-project').addEventListener('click', () => {
-    const name = prompt('Enter project name:');
-    if (!name || !name.trim()) return;
-    const id = createProject(name.trim());
-    activeProjectId = id;
-    saveActiveProjectId();
-    progress = loadProgress();
-    refreshProjectSelect();
-    rebuildVocab();
-    typingState.index = 0;
-    currentIndex = 0;
-    updateProjectTitle();
-    updateImportModeUI();
-    // Switch to import tab so user can start adding words
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector('[data-mode="import"]').classList.add('active');
-    document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
-    document.getElementById('import-mode').classList.add('active');
-    currentMode = 'import';
-  });
-}
-
-function refreshProjectSelect() {
-  const sel = document.getElementById('project-select');
-  sel.innerHTML = '';
-  BUILTIN_PROJECTS.forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    opt.textContent = p.name + ' (Built-in)';
-    sel.appendChild(opt);
-  });
-  customProjects.forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    opt.textContent = p.name;
-    sel.appendChild(opt);
-  });
-  sel.value = activeProjectId;
-}
 
 function updateProjectTitle() {
   const project = getActiveProject();
