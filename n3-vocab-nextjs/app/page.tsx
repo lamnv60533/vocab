@@ -28,6 +28,7 @@ export default function Home() {
               <button className="nav-btn active" data-mode="flashcard">Flashcards</button>
               <button className="nav-btn" data-mode="typing">Typing</button>
               <button className="nav-btn" data-mode="quiz">Quiz</button>
+              <button className="nav-btn" data-mode="conjugate">Chia động từ</button>
               <button className="nav-btn" data-mode="list">Word List</button>
               <button className="nav-btn" data-mode="stats">Stats</button>
             </nav>
@@ -151,6 +152,106 @@ export default function Home() {
               <div id="quiz-score"></div>
               <div id="quiz-review"></div>
               <button id="btn-retry-quiz" className="primary-btn">Try Again</button>
+            </div>
+          </section>
+
+          {/* ---- Conjugate Mode ---- */}
+          <section id="conjugate-mode" className="mode">
+            {/* Phase: form selector */}
+            <div id="conj-select" className="conj-phase">
+              <h2 className="conj-title">Chia Động Từ</h2>
+              <p className="conj-subtitle">Chọn dạng chia muốn luyện tập</p>
+              <div className="conj-form-grid">
+                <button className="conj-form-btn" data-form="te">
+                  <span className="conj-form-jp">て-form</span>
+                  <span className="conj-form-vi">Nối động từ</span>
+                </button>
+                <button className="conj-form-btn" data-form="nai">
+                  <span className="conj-form-jp">ない-form</span>
+                  <span className="conj-form-vi">Phủ định</span>
+                </button>
+                <button className="conj-form-btn" data-form="ta">
+                  <span className="conj-form-jp">た-form</span>
+                  <span className="conj-form-vi">Quá khứ</span>
+                </button>
+                <button className="conj-form-btn" data-form="potential">
+                  <span className="conj-form-jp">〜できる</span>
+                  <span className="conj-form-vi">Tiềm năng</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Phase: rule card */}
+            <div id="conj-card" className="conj-phase hidden">
+              <div className="conj-rule-card">
+                <div className="conj-card-header">
+                  <h2 id="conj-card-title"></h2>
+                  <div id="conj-card-usage" className="conj-card-usage"></div>
+                </div>
+                <div id="conj-card-patterns" className="conj-card-patterns"></div>
+              </div>
+              <div className="conj-card-actions">
+                <button id="btn-conj-start-drill" className="primary-btn">Bắt đầu luyện tập →</button>
+                <button id="btn-conj-skip-card" className="conj-skip-link">Bỏ qua, luyện tập ngay</button>
+              </div>
+            </div>
+
+            {/* Phase: drill */}
+            <div id="conj-drill" className="conj-phase hidden">
+              <div className="conj-drill-card">
+                <div id="conj-drill-verb" className="conj-drill-verb"></div>
+                <div id="conj-drill-form-label" className="conj-drill-form-label"></div>
+                <div id="conj-drill-sentence" className="conj-drill-sentence hidden"></div>
+                <div className="typing-input-area">
+                  <input type="text" id="conj-input" placeholder="Nhập romaji..." autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} inputMode="text" />
+                  <button id="btn-conj-check" className="primary-btn">Check</button>
+                </div>
+                <div id="conj-feedback" className="hidden"></div>
+                <div id="conj-answer-reveal" className="hidden">
+                  <div id="conj-mini-summary" className="conj-mini-summary"></div>
+                </div>
+              </div>
+              <div className="typing-controls">
+                <button id="btn-conj-skip" className="control-btn">Skip</button>
+                <span id="conj-counter">1 / 20</span>
+                <button id="btn-conj-next" className="control-btn">Next</button>
+              </div>
+              <div className="conj-drill-footer">
+                <button id="btn-conj-to-battle" className="action-btn shuffle">⚡ Speed Battle</button>
+                <button id="btn-conj-back" className="action-btn unknown">← Chọn dạng khác</button>
+              </div>
+            </div>
+
+            {/* Phase: speed battle */}
+            <div id="conj-battle" className="conj-phase hidden">
+              <div id="conj-battle-ready">
+                <h2 className="conj-title">⚡ Speed Battle</h2>
+                <p className="conj-subtitle">60 giây — chia động từ càng nhiều càng tốt!</p>
+                <button id="btn-conj-battle-start" className="primary-btn">Bắt đầu!</button>
+                <div id="conj-battle-highscore" className="conj-battle-hs"></div>
+                <button id="btn-conj-battle-back" className="conj-skip-link" style={{marginTop: '12px'}}>← Quay lại luyện tập</button>
+              </div>
+              <div id="conj-battle-playing" className="hidden">
+                <div className="conj-battle-hud">
+                  <span id="conj-battle-timer" className="conj-battle-timer">1:00</span>
+                  <span id="conj-battle-streak" className="conj-battle-streak">🔥 0</span>
+                  <span id="conj-battle-score-live" className="conj-battle-score-live">0</span>
+                </div>
+                <div id="conj-battle-boss-badge" className="conj-boss-badge hidden">👹 BOSS!</div>
+                <div id="conj-battle-verb" className="conj-drill-verb"></div>
+                <div id="conj-battle-form-label" className="conj-drill-form-label"></div>
+                <div className="typing-input-area">
+                  <input type="text" id="conj-battle-input" placeholder="Nhập romaji..." autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} inputMode="text" />
+                </div>
+                <div id="conj-battle-feedback" className="conj-battle-feedback hidden"></div>
+              </div>
+              <div id="conj-battle-result" className="hidden">
+                <h2 className="conj-title">Kết quả</h2>
+                <div id="conj-battle-final-score" className="conj-final-score"></div>
+                <div id="conj-battle-final-hs" className="conj-battle-hs"></div>
+                <button id="btn-conj-battle-retry" className="primary-btn">Chơi lại</button>
+                <button id="btn-conj-after-battle-back" className="conj-skip-link" style={{marginTop: '12px'}}>← Quay lại luyện tập</button>
+              </div>
             </div>
           </section>
 
@@ -292,6 +393,9 @@ export default function Home() {
         </div>{/* end #main */}
       </div>{/* end #layout */}
 
+      <Script src="/conjugation-engine.js" strategy="beforeInteractive" />
+      <Script src="/conjugation-rules.js" strategy="beforeInteractive" />
+      <Script src="/conjugation-examples.js" strategy="beforeInteractive" />
       <Script src="/vocab-data.js" strategy="beforeInteractive" />
       <Script src="/mimikara-data.js" strategy="beforeInteractive" />
       <Script src="/verb-data.js" strategy="beforeInteractive" />

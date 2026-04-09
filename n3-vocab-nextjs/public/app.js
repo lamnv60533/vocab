@@ -132,6 +132,7 @@ function init() {
   setupWordList();
   setupStats();
   setupImport();
+  setupConjugate();
   setupProjectWordManagement();
   applyFilter();
   renderFlashcard();
@@ -468,6 +469,7 @@ function setupNavigation() {
       }
       if (mode === 'list') renderWordList();
       if (mode === 'stats') renderStats();
+      if (mode === 'conjugate') conjShowPhase('select');
     });
   });
 }
@@ -1519,6 +1521,346 @@ function speakWord(text) {
   utterance.lang = 'ja-JP';
   utterance.rate = 0.85;
   window.speechSynthesis.speak(utterance);
+}
+
+// ---- Conjugate Mode ----
+let conjState = {
+  form: null,       // 'te' | 'nai' | 'ta' | 'potential'
+  phase: 'select',  // 'select' | 'card' | 'drill' | 'battle'
+  drillVocab: [],
+  drillIndex: 0,
+  answered: false,
+  score: 0,
+  streak: 0,
+  bossMode: false,
+  battleTimer: null,
+  battleTimeLeft: 60,
+};
+
+const BOSS_VERBS = [
+  { kanji: 'します',   reading: 'します',   category: 'verb-group3', meaning: 'làm' },
+  { kanji: 'きます',   reading: 'きます',   category: 'verb-group3', meaning: 'đến/lại' },
+  { kanji: 'いきます', reading: 'いきます', category: 'verb-group1', meaning: 'đi' },
+];
+
+function conjShowPhase(phase) {
+  ['conj-select','conj-card','conj-drill','conj-battle'].forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
+  document.getElementById('conj-' + phase).classList.remove('hidden');
+}
+
+function conjBuildRuleCard(ruleData) {
+  document.getElementById('conj-card-title').textContent = `${ruleData.name} (${ruleData.nameVi})`;
+  document.getElementById('conj-card-usage').textContent = ruleData.usageVi;
+
+  const patternsEl = document.getElementById('conj-card-patterns');
+  patternsEl.innerHTML = '';
+  ruleData.patterns.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'conj-pattern-group';
+    let html = `<div class="conj-pattern-group-name">${p.group}</div>`;
+    html += `<div class="conj-pattern-rule">${p.rule}</div>`;
+    if (p.table) {
+      html += `<table class="conj-pattern-table">`;
+      p.table.forEach(row => {
+        html += `<tr><td>${row.from}</td><td>→ ${row.to}</td><td>${row.ex}</td></tr>`;
+      });
+      html += `</table>`;
+    }
+    if (p.ex && !p.table) html += `<div class="conj-pattern-ex">${p.ex}</div>`;
+    if (p.note) html += `<div class="conj-pattern-note">${p.note}</div>`;
+    div.innerHTML = html;
+    patternsEl.appendChild(div);
+  });
+}
+
+function conjBuildDrillVocab() {
+  // Use all VERB_VOCAB verbs (all groups), shuffle
+  const vocab = [...VERB_VOCAB].filter(w => w.reading && w.category && w.category.startsWith('verb-'));
+  shuffleArray(vocab);
+  return vocab;
+}
+
+function conjRenderDrillCard() {
+  const word = conjState.drillVocab[conjState.drillIndex];
+  if (!word) return;
+
+  conjState.answered = false;
+  imeReset();
+
+  document.getElementById('conj-input').value = '';
+  document.getElementById('conj-input').classList.remove('correct-input', 'wrong-input');
+  document.getElementById('conj-feedback').className = 'hidden';
+  document.getElementById('conj-answer-reveal').className = 'hidden';
+  document.getElementById('conj-mini-summary').textContent = '';
+
+  document.getElementById('conj-drill-verb').textContent = word.kanji || word.reading;
+  const formLabels = { te: '→ Thể て', nai: '→ Thể ない (phủ định)', ta: '→ Thể た (quá khứ)', potential: '→ Thể tiềm năng (có thể...)' };
+  document.getElementById('conj-drill-form-label').textContent = formLabels[conjState.form] || '';
+
+  // Context sentence if available
+  const examples = getConjugationExamples(conjState.form);
+  const ex = examples.find(e => e.reading === word.reading);
+  const sentEl = document.getElementById('conj-drill-sentence');
+  if (ex) {
+    sentEl.textContent = ex.sentence;
+    sentEl.classList.remove('hidden');
+    sentEl.dataset.hint = ex.hint || '';
+  } else {
+    sentEl.classList.add('hidden');
+    sentEl.textContent = '';
+  }
+
+  document.getElementById('conj-counter').textContent = `${conjState.drillIndex + 1} / ${conjState.drillVocab.length}`;
+  document.getElementById('conj-input').focus();
+}
+
+function conjCheckAnswer() {
+  if (conjState.answered) return;
+  const word = conjState.drillVocab[conjState.drillIndex];
+  if (!word) return;
+
+  const correct = conjugate(word.reading, word.category, conjState.form);
+  if (!correct) { conjNextDrill(); return; }
+
+  const userInput = imeGetDisplay().trim();
+  const isCorrect = userInput === correct;
+
+  const inputEl = document.getElementById('conj-input');
+  const feedbackEl = document.getElementById('conj-feedback');
+  const revealEl = document.getElementById('conj-answer-reveal');
+  const summaryEl = document.getElementById('conj-mini-summary');
+
+  inputEl.classList.toggle('correct-input', isCorrect);
+  inputEl.classList.toggle('wrong-input', !isCorrect);
+  feedbackEl.classList.remove('hidden');
+  feedbackEl.className = isCorrect ? 'typing-feedback correct' : 'typing-feedback wrong';
+  feedbackEl.textContent = isCorrect ? '✓ Đúng rồi!' : `✗ Sai — đáp án: ${correct}`;
+
+  revealEl.classList.remove('hidden');
+  summaryEl.textContent = conjugateSummary(word.reading, word.category, conjState.form);
+
+  conjState.answered = true;
+}
+
+function conjNextDrill() {
+  conjState.drillIndex = (conjState.drillIndex + 1) % conjState.drillVocab.length;
+  conjRenderDrillCard();
+}
+
+// ---- Battle ----
+function conjStartBattle() {
+  conjState.score = 0;
+  conjState.streak = 0;
+  conjState.bossMode = false;
+  conjState.battleTimeLeft = 60;
+
+  document.getElementById('conj-battle-ready').classList.add('hidden');
+  document.getElementById('conj-battle-result').classList.add('hidden');
+  document.getElementById('conj-battle-playing').classList.remove('hidden');
+  document.getElementById('conj-boss-badge').classList.add('hidden');
+
+  conjBattleRenderWord();
+  conjUpdateBattleHUD();
+
+  conjState.battleTimer = setInterval(() => {
+    conjState.battleTimeLeft--;
+    conjUpdateBattleHUD();
+
+    if (conjState.battleTimeLeft <= 0) {
+      clearInterval(conjState.battleTimer);
+      conjEndBattle();
+    }
+    // Boss round trigger: 45s elapsed or streak 10
+    if (!conjState.bossMode && (conjState.battleTimeLeft <= 15 || conjState.streak >= 10)) {
+      conjState.bossMode = true;
+      document.getElementById('conj-boss-badge').classList.remove('hidden');
+    }
+  }, 1000);
+}
+
+function conjUpdateBattleHUD() {
+  const t = conjState.battleTimeLeft;
+  const timerEl = document.getElementById('conj-battle-timer');
+  timerEl.textContent = `0:${t < 10 ? '0' + t : t}`;
+  timerEl.className = 'conj-battle-timer' + (t <= 10 ? ' danger' : t <= 20 ? ' warning' : '');
+  document.getElementById('conj-battle-streak').textContent = `🔥 ${conjState.streak}`;
+  document.getElementById('conj-battle-score-live').textContent = conjState.score;
+}
+
+function conjBattleRenderWord() {
+  const pool = conjState.bossMode ? BOSS_VERBS : VERB_VOCAB.filter(w => w.category && w.category.startsWith('verb-'));
+  const word = pool[Math.floor(Math.random() * pool.length)];
+  conjState._battleWord = word;
+
+  imeReset();
+  document.getElementById('conj-battle-input').value = '';
+  document.getElementById('conj-battle-input').classList.remove('correct-input', 'wrong-input');
+  document.getElementById('conj-battle-feedback').classList.add('hidden');
+
+  document.getElementById('conj-battle-verb').textContent = word.kanji || word.reading;
+  const formLabels = { te: 'て-form', nai: 'ない-form', ta: 'た-form (quá khứ)', potential: 'Thể tiềm năng' };
+  document.getElementById('conj-battle-form-label').textContent = '→ ' + (formLabels[conjState.form] || '');
+}
+
+function conjBattleCheck() {
+  const word = conjState._battleWord;
+  if (!word) return;
+  const correct = conjugate(word.reading, word.category, conjState.form);
+  if (!correct) { conjBattleRenderWord(); return; }
+
+  const userInput = imeGetDisplay().trim();
+  const isCorrect = userInput === correct;
+  const fb = document.getElementById('conj-battle-feedback');
+  fb.classList.remove('hidden');
+  fb.className = 'conj-battle-feedback ' + (isCorrect ? 'correct' : 'wrong');
+
+  if (isCorrect) {
+    conjState.streak++;
+    conjState.score += 10 + Math.floor(conjState.streak / 3) * 5; // streak bonus
+    fb.textContent = `✓  +${10 + Math.floor(conjState.streak / 3) * 5}`;
+    setTimeout(() => conjBattleRenderWord(), 400);
+  } else {
+    conjState.streak = 0;
+    fb.textContent = `✗  ${correct}`;
+    document.getElementById('conj-battle-input').classList.add('wrong-input');
+    document.getElementById('conj-battle-input').classList.add('shake');
+    setTimeout(() => {
+      document.getElementById('conj-battle-input').classList.remove('shake', 'wrong-input');
+      conjBattleRenderWord();
+    }, 700);
+  }
+  conjUpdateBattleHUD();
+}
+
+function conjEndBattle() {
+  document.getElementById('conj-battle-playing').classList.add('hidden');
+  document.getElementById('conj-battle-result').classList.remove('hidden');
+  document.getElementById('conj-final-score').textContent = conjState.score;
+
+  const hsKey = 'conj-hs-' + conjState.form;
+  const prev = parseInt(localStorage.getItem(hsKey)) || 0;
+  const isNew = conjState.score > prev;
+  if (isNew) localStorage.setItem(hsKey, conjState.score);
+  document.getElementById('conj-battle-final-hs').textContent = isNew
+    ? `🏆 Kỷ lục mới!`
+    : `Kỷ lục: ${prev}`;
+  document.getElementById('conj-battle-highscore').textContent = `Kỷ lục: ${Math.max(conjState.score, prev)}`;
+}
+
+function setupConjugate() {
+  // Form selector buttons
+  document.querySelectorAll('.conj-form-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      conjState.form = btn.dataset.form;
+      const rule = CONJUGATION_RULES.find(r => r.id === conjState.form);
+      if (rule) conjBuildRuleCard(rule);
+      conjShowPhase('card');
+    });
+  });
+
+  // Rule card → start drill
+  document.getElementById('btn-conj-start-drill').addEventListener('click', () => {
+    conjState.drillVocab = conjBuildDrillVocab();
+    conjState.drillIndex = 0;
+    conjShowPhase('drill');
+    conjRenderDrillCard();
+  });
+
+  // Skip rule card
+  document.getElementById('btn-conj-skip-card').addEventListener('click', () => {
+    conjState.drillVocab = conjBuildDrillVocab();
+    conjState.drillIndex = 0;
+    conjShowPhase('drill');
+    conjRenderDrillCard();
+  });
+
+  // Drill input — reuse IME engine
+  const conjInput = document.getElementById('conj-input');
+  conjInput.addEventListener('keydown', (e) => {
+    if (conjState.answered) {
+      if (e.key === 'Enter') conjNextDrill();
+      return;
+    }
+    if (e.key === 'Enter') { e.preventDefault(); conjCheckAnswer(); return; }
+    if (e.key === 'Backspace') { e.preventDefault(); imeBackspace(); conjInput.value = imeGetDisplay(); return; }
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      imeInput(e.key);
+      conjInput.value = imeGetDisplay();
+    }
+  });
+
+  document.getElementById('btn-conj-check').addEventListener('click', conjCheckAnswer);
+  document.getElementById('btn-conj-next').addEventListener('click', conjNextDrill);
+  document.getElementById('btn-conj-skip').addEventListener('click', conjNextDrill);
+
+  document.getElementById('btn-conj-back').addEventListener('click', () => {
+    conjShowPhase('select');
+  });
+
+  // To battle
+  document.getElementById('btn-conj-to-battle').addEventListener('click', () => {
+    if (conjState.battleTimer) clearInterval(conjState.battleTimer);
+    document.getElementById('conj-battle-ready').classList.remove('hidden');
+    document.getElementById('conj-battle-playing').classList.add('hidden');
+    document.getElementById('conj-battle-result').classList.add('hidden');
+    const hsKey = 'conj-hs-' + conjState.form;
+    const prev = parseInt(localStorage.getItem(hsKey)) || 0;
+    document.getElementById('conj-battle-highscore').textContent = prev > 0 ? `Kỷ lục: ${prev}` : '';
+    conjShowPhase('battle');
+  });
+
+  document.getElementById('btn-conj-battle-start').addEventListener('click', conjStartBattle);
+  document.getElementById('btn-conj-battle-retry').addEventListener('click', () => {
+    if (conjState.battleTimer) clearInterval(conjState.battleTimer);
+    conjStartBattle();
+  });
+  document.getElementById('btn-conj-battle-back').addEventListener('click', () => {
+    if (conjState.battleTimer) clearInterval(conjState.battleTimer);
+    conjShowPhase('drill');
+  });
+  document.getElementById('btn-conj-after-battle-back').addEventListener('click', () => {
+    if (conjState.battleTimer) clearInterval(conjState.battleTimer);
+    conjShowPhase('drill');
+  });
+
+  // Battle input
+  const battleInput = document.getElementById('conj-battle-input');
+  battleInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); conjBattleCheck(); return; }
+    if (e.key === 'Backspace') { e.preventDefault(); imeBackspace(); battleInput.value = imeGetDisplay(); return; }
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      imeInput(e.key);
+      battleInput.value = imeGetDisplay();
+    }
+  });
+
+  // Mobile keyboard float for drill controls (reuse same pattern as typing mode)
+  const drillControls = document.querySelector('#conj-drill .typing-controls');
+  function updateConjControlsPos() {
+    if (!window.visualViewport || !drillControls) return;
+    const kbHeight = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
+    if (kbHeight > 100 && (document.activeElement === conjInput || document.activeElement === battleInput)) {
+      drillControls.style.position = 'fixed';
+      drillControls.style.bottom = kbHeight + 'px';
+      drillControls.style.left = '0';
+      drillControls.style.right = '0';
+      drillControls.style.zIndex = '200';
+      drillControls.style.background = '#0d0d20';
+      drillControls.style.borderTop = '1px solid #1a1a2e';
+      drillControls.style.margin = '0';
+      drillControls.style.padding = '10px 16px';
+    } else {
+      drillControls.removeAttribute('style');
+    }
+  }
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', updateConjControlsPos);
+  }
+  conjInput.addEventListener('blur', () => setTimeout(() => drillControls && drillControls.removeAttribute('style'), 100));
 }
 
 // ---- Utility ----
